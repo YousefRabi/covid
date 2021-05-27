@@ -19,11 +19,12 @@ def create_kfold_split_uniform(input_path: Path, output_path: Path, folds: int =
         for i, (train_index, test_index) in enumerate(skf.split(s.index, s.study_id)):
             s.loc[test_index, 'fold'] = i
         s.to_csv(output_path, index=False)
-        print('No. folds: {}'.format(len(s[s['fold'] == -1])))
+        print('No folds: {}'.format(len(s[s['fold'] == -1])))
 
         for i in range(folds):
             part = s[s['fold'] == i]
             print(i, len(part))
+
     else:
         print('File already exists: {}'.format(output_path))
 
