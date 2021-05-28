@@ -9,20 +9,15 @@ def create_kfold_split_uniform(input_path: Path, output_path: Path, folds: int =
     if not output_path.exists():
         skf = StratifiedKFold(n_splits=folds, random_state=seed, shuffle=True)
         train = pd.read_csv(input_path)
-        image_ids = train['id'].values
-        study_ids = train['StudyInstanceUID'].values
-        assert len(image_ids) == len(study_ids)
-        print(len(image_ids))
 
-        s = pd.DataFrame(data=list(zip(image_ids, study_ids)), columns=['image_id', 'study_id'])
-        s['fold'] = -1
-        for i, (train_index, test_index) in enumerate(skf.split(s.index, s.study_id)):
-            s.loc[test_index, 'fold'] = i
-        s.to_csv(output_path, index=False)
-        print('No folds: {}'.format(len(s[s['fold'] == -1])))
+        train['fold'] = -1
+        for i, (train_index, test_index) in enumerate(skf.split(train.index, train.StudyInstanceUID)):
+            train.loc[test_index, 'fold'] = i
+        train.to_csv(output_path, index=False)
+        print('No folds: {}'.format(len(train[train['fold'] == -1])))
 
         for i in range(folds):
-            part = s[s['fold'] == i]
+            part = train[train['fold'] == i]
             print(i, len(part))
 
     else:
