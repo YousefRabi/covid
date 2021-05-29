@@ -1,3 +1,6 @@
+*.pt
+
 data/
 notebooks/
+src/trained-models
 __pycache__/
