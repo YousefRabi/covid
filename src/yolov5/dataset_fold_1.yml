@@ -1,6 +1,6 @@
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-train: ../../data/processed/yolov5_data/train/train_fold_1/
-val: ../../data/processed/yolov5_data/train/valid_fold_1/
+train: ./../data/processed/yolov5_data/train/train_fold_1/images
+val: ./../data/processed/yolov5_data/train/valid_fold_1/images
 
 # number of classes
 nc: 1
