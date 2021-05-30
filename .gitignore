@@ -4,3 +4,4 @@ data/
 notebooks/
 src/trained-models
 __pycache__/
+src/wandb
