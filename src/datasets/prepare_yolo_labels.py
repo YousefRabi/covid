@@ -9,13 +9,16 @@ import numpy as np
 from utils.utils import get_train_test_image_sizes
 
 
-def copy_images_for_yolo(input_path: Path,
+def copy_images_for_yolo(split_file,
+                         input_path: Path,
                          output_path: Path):
+    split_df = pd.read_csv(split_file)
     files = list(input_path.rglob('*.png'))
     output_path.mkdir(parents=True, exist_ok=True)
 
     for f in files:
-        shutil.copy(f, output_path / f.name)
+        if str(split_df[split_df['id'] == f.stem + '_image']['boxes']) != 'nan':
+            shutil.copy(f, output_path / f.name)
 
 
 def create_labels_for_yolo(split_file, labels_output_path: Path):
@@ -28,10 +31,10 @@ def create_labels_for_yolo(split_file, labels_output_path: Path):
         image_id = image_id.split('_')[0]
         print(image_id, len(group))
         out_file_path = labels_output_path / f'{image_id}.txt'
-        out = open(out_file_path, 'w')
         for _, row in group.iterrows():
             if str(row['boxes']) == 'nan':
                 continue
+            out = open(out_file_path, 'w')
             boxes = ast.literal_eval(row['boxes'])
             for box in boxes:
                 xmin, ymin = box['x'], box['y']
@@ -74,13 +77,12 @@ def create_yolo_folds(split_file: str, imgs_folder: Path, labels_folder: Path, f
         try:
             shutil.copy(labels_folder / train_label_name,
                         train_fold_folder / 'labels' / train_label_name)
+            shutil.copy((imgs_folder / train_image_name).with_suffix('.png'),
+                        (train_fold_folder / 'images' / train_image_name).with_suffix('.png'))
             images_copied += 1
         except Exception as e:
             print(f'Exception: {e} -- Image name: {train_image_name}')
             continue
-
-        shutil.copy((imgs_folder / train_image_name).with_suffix('.png'),
-                    train_fold_folder / 'images' / train_image_name)
 
     print(f'Copied {images_copied} training images for fold {fold_num} to {train_fold_folder / "images"}')
 
@@ -90,13 +92,12 @@ def create_yolo_folds(split_file: str, imgs_folder: Path, labels_folder: Path, f
         try:
             shutil.copy(labels_folder / valid_label_name,
                         valid_fold_folder / 'labels' / valid_label_name)
+            shutil.copy((imgs_folder / valid_image_name).with_suffix('.png'),
+                        (valid_fold_folder / 'images' / valid_image_name).with_suffix('.png'))
             images_copied += 1
         except Exception as e:
             print(f'Exception: {e} -- Image name: {valid_image_name}')
             continue
-
-        shutil.copy((imgs_folder / valid_image_name).with_suffix('.png'),
-                    valid_fold_folder / 'images' / valid_image_name)
 
     print(f'Copied {images_copied} validation images for fold {fold_num} to {valid_fold_folder / "images"}')
 
@@ -106,9 +107,11 @@ def main():
     out_folder = Path('data/processed/yolov5_data')
     out_folder.mkdir(parents=True, exist_ok=True)
 
-    copy_images_for_yolo(Path('data/processed/train'),
+    copy_images_for_yolo(split_file,
+                         Path('data/processed/train'),
                          Path(out_folder / 'train' / 'all_images'))
-    copy_images_for_yolo(Path('data/processed/test'),
+    copy_images_for_yolo(split_file,
+                         Path('data/processed/test'),
                          Path(out_folder / 'test' / 'images'))
 
     create_labels_for_yolo(split_file, out_folder / 'train' / 'all_labels')
