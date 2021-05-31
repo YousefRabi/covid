@@ -19,3 +19,4 @@ Pillow
 protobuf
 PyYAML
 scikit_learn
+pytest
