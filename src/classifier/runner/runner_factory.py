@@ -299,11 +299,6 @@ class Runner:
         false_neg_count = metrics_t[METRICS_FN_NDX].sum().item()
         false_pos_count = metrics_t[METRICS_FP_NDX].sum().item()
 
-        print('true_pos_count: ', true_pos_count)
-        print('true_neg_count: ', true_neg_count)
-        print('false_neg_count: ', false_neg_count)
-        print('false_pos_count: ', false_pos_count)
-
         pos_label_count = true_pos_count + false_neg_count
 
         all_examples_count = true_neg_count + true_pos_count + false_pos_count + false_neg_count
