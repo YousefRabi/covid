@@ -1,0 +1,58 @@
+data:
+  train_dir: 'data/MURA-v1.1/train'
+  valid_dir: 'data/MURA-v1.1/valid'
+  num_classes: 1
+  idx_fold: 0
+  num_folds: 1
+  dataset_name: 'MURADataset'
+  image_resolution: 256
+
+model:
+  arch: 'ClassificationModel'
+  params:
+    encoder_name: 'efficientnet-b0'
+    num_classes: 1
+    pretrained: True
+
+train:
+  batch_size: 64
+  overfit_single_batch: False
+  num_epochs: 50
+
+test:
+  batch_size: 64
+  cls_threshold: 0.5
+  tta:
+    horizontal: False
+    vertical: False
+
+transforms:
+  train:
+    randaugment:
+      p: 1.0
+      N: 1
+      M: 1
+
+  test:
+    AssertShape:
+      p: 1.0
+      height: 256
+      width: 256
+
+loss:
+  name: "BCE"
+  params:
+    reduction: 'none'
+
+optimizer:
+  name: 'Adam'
+  params:
+    lr: 0.001
+
+scheduler:
+  name: ''
+
+num_workers: 8
+device: 'cuda:0'
+multi_gpu: False
+debug: False
