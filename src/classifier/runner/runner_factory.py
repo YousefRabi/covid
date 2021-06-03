@@ -252,9 +252,6 @@ class Runner:
             logits_g = self.model(input_g)
             probability_g = torch.nn.functional.softmax(logits_g, dim=-1)
 
-            print('logits_g shape: ', logits_g.shape)
-            print('labels_g shape: ', label_g.shape)
-
             loss_g = self.loss_func(
                 logits_g,
                 label_g,
