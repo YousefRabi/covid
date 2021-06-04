@@ -238,11 +238,11 @@ class Runner:
                 device=self.device,
             )
             val_labels_arr = np.empty(
-                (len(val_dl.dataset), 6),  # image_id, label_name, xmin, ymin, xmax, ymax
+                (len(val_dl.dataset), 6),  # image_id, label_name, xmin, xmax, ymin, ymax
                 dtype='object',
             )
             val_preds_arr = np.empty(
-                (len(val_dl.dataset), 7),  # image_id, label_name, conf, xmin, ymin, xmax, ymax
+                (len(val_dl.dataset), 7),  # image_id, label_name, conf, xmin, xmax, ymin, ymax
                 dtype='object',
             )
 
@@ -271,6 +271,8 @@ class Runner:
         label_g = label_t.to(self.device, non_blocking=True)
         image_id_arr = np.array(image_id_list)
 
+        id2label = {0: 'negative', 1: 'typical', 2: 'indeterminate', 3: 'atypical'}
+
         with autocast():
             logits_g = self.model(input_g)
             probability_arr = torch.nn.functional.softmax(logits_g, dim=-1).cpu().detach().numpy()
@@ -293,16 +295,16 @@ class Runner:
             metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = loss_g
 
             labels_arr[start_ndx:end_ndx, 0] = image_id_arr
-            labels_arr[start_ndx:end_ndx, 1] = label_g.cpu().detach().numpy()
-            labels_arr[start_ndx:end_ndx, 2:] = [0, 0, 1, 1]
+            labels_arr[start_ndx:end_ndx, 1] = [id2label[class_id] for class_id in label_g.cpu().detach().numpy()]
+            labels_arr[start_ndx:end_ndx, 2:] = [0, 1, 0, 1]
 
             preds_arr[start_ndx:end_ndx, 0] = image_id_arr
-            preds_arr[start_ndx:end_ndx, 1] = prediction_arr
+            preds_arr[start_ndx:end_ndx, 1] = [id2label[class_id] for class_id in prediction_arr]
             preds_arr[start_ndx:end_ndx, 2:3] = np.take_along_axis(
                 arr=probability_arr,
                 indices=prediction_arr[:, np.newaxis],
                 axis=1)
-            preds_arr[start_ndx:end_ndx, 3:] = [0, 0, 1, 1]
+            preds_arr[start_ndx:end_ndx, 3:] = [0, 1, 0, 1]
 
         return loss_g.mean()
 
@@ -324,7 +326,7 @@ class Runner:
 
         log.info(
             ("E{} {:8} {loss/all:.4f} loss, "
-             + "{map/all:.4f} precision, "
+             + "{map/all:.4f} mAP@0.5"
              ).format(
                 epoch_ndx,
                 mode_str,
