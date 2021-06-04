@@ -10,6 +10,8 @@ import torch
 from torch.cuda.amp import autocast
 from torch.utils.tensorboard import SummaryWriter
 
+from map_boxes import mean_average_precision_for_boxes
+
 from classifier.models import get_model
 from classifier.optimizers import get_optimizer
 from classifier.datasets import get_dataloader
@@ -149,12 +151,12 @@ class Runner:
                 self.config.train.batch_size,
             ))
 
-            trn_metrics_t = self.do_training(epoch_ndx, train_dl)
-            self.log_metrics(epoch_ndx, 'trn', trn_metrics_t)
+            trn_metrics_t, labels_arr, preds_arr = self.do_training(epoch_ndx, train_dl)
+            self.log_metrics(epoch_ndx, 'trn', trn_metrics_t, labels_arr, preds_arr)
 
             if not self.config.train.overfit_single_batch:
-                val_metrics_t = self.do_validation(epoch_ndx, val_dl)
-                score = self.log_metrics(epoch_ndx, 'val', val_metrics_t)
+                val_metrics_t, labels_arr, preds_arr = self.do_validation(epoch_ndx, val_dl)
+                score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
 
                 if score > self.best_score:
                     log.info(f'Score improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
@@ -190,7 +192,15 @@ class Runner:
         trn_metrics_g = torch.zeros(
             METRICS_SIZE,
             len(train_dl.dataset),
-            device=self.device,
+            device=self.device
+        )
+        trn_labels_arr = np.empty(
+            (len(train_dl.dataset), 6),  # image_id, label_name, xmin, ymin, xmax, ymax
+            dtype='object',
+        )
+        trn_preds_arr = np.empty(
+            (len(train_dl.dataset), 7),  # image_id, label_name, conf, xmin, ymin, xmax, ymax
+            dtype='object',
         )
 
         batch_iter = enumerate_with_estimate(
@@ -207,6 +217,8 @@ class Runner:
                 batch_tup,
                 train_dl.batch_size,
                 trn_metrics_g,
+                trn_labels_arr,
+                trn_preds_arr
             )
 
             self.scaler.scale(loss_var).backward()
@@ -215,7 +227,7 @@ class Runner:
 
         self.total_training_samples_count += len(train_dl.dataset)
 
-        return trn_metrics_g.to('cpu')
+        return trn_metrics_g.to('cpu'), trn_labels_arr, trn_preds_arr
 
     def do_validation(self, epoch_ndx, val_dl):
         with torch.no_grad():
@@ -224,6 +236,14 @@ class Runner:
                 METRICS_SIZE,
                 len(val_dl.dataset),
                 device=self.device,
+            )
+            val_labels_arr = np.empty(
+                (len(val_dl.dataset), 6),  # image_id, label_name, xmin, ymin, xmax, ymax
+                dtype='object',
+            )
+            val_preds_arr = np.empty(
+                (len(val_dl.dataset), 7),  # image_id, label_name, conf, xmin, ymin, xmax, ymax
+                dtype='object',
             )
 
             batch_iter = enumerate_with_estimate(
@@ -238,19 +258,22 @@ class Runner:
                     batch_tup,
                     val_dl.batch_size,
                     val_metrics_g,
+                    val_labels_arr,
+                    val_preds_arr,
                 )
 
-        return val_metrics_g.to('cpu')
+        return val_metrics_g.to('cpu'), val_labels_arr, val_preds_arr
 
-    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g):
-        input_t, label_t, _ = batch_tup
+    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g, labels_arr, preds_arr):
+        input_t, label_t, image_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
+        image_id_arr = np.array(image_id_list)
 
         with autocast():
             logits_g = self.model(input_g)
-            probability_g = torch.nn.functional.softmax(logits_g, dim=-1)
+            probability_arr = torch.nn.functional.softmax(logits_g, dim=-1).cpu().detach().numpy()
 
             loss_g = self.loss_func(
                 logits_g,
@@ -261,26 +284,25 @@ class Runner:
         end_ndx = start_ndx + batch_size
 
         with torch.no_grad():
-            prediction_g = torch.argmax(probability_g, dim=-1)
-            prediction_g = torch.nn.functional.one_hot(prediction_g, num_classes=4)
-            prediction_bool_g = prediction_g.to(torch.bool)
-            label_g = torch.nn.functional.one_hot(label_g, num_classes=4)
-            label_bool_g = label_g.to(torch.bool)
+            prediction_arr = np.argmax(probability_arr, axis=-1)
 
-            assert prediction_g.shape == label_g.shape, ('prediction_g shape: '
-                                                         f'{prediction_g.shape} - '
-                                                         f'label_g shape: {label_g.shape}')
-
-            tp = (prediction_bool_g[:, 1:] * label_bool_g[:, 1:]).sum(dim=[-1])
-            tn = (prediction_bool_g[:, :1] * label_bool_g[:, :1]).sum(dim=[-1])
-            fn = (prediction_bool_g[:, :1] * ~label_bool_g[:, :1]).sum(dim=[-1])
-            fp = (prediction_bool_g[:, 1:] * ~label_bool_g[:, 1:]).sum(dim=[-1])
+            assert prediction_arr.shape == label_g.shape, ('prediction_arr shape: '
+                                                           f'{prediction_arr.shape} - '
+                                                           f'label_g shape: {label_g.shape}')
 
             metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = loss_g
-            metrics_g[METRICS_TP_NDX, start_ndx:end_ndx] = tp
-            metrics_g[METRICS_TN_NDX, start_ndx:end_ndx] = tn
-            metrics_g[METRICS_FN_NDX, start_ndx:end_ndx] = fn
-            metrics_g[METRICS_FP_NDX, start_ndx:end_ndx] = fp
+
+            labels_arr[start_ndx:end_ndx, 0] = image_id_arr
+            labels_arr[start_ndx:end_ndx, 1] = label_g.cpu().detach().numpy()
+            labels_arr[start_ndx:end_ndx, 2:] = [0, 0, 1, 1]
+
+            preds_arr[start_ndx:end_ndx, 0] = image_id_arr
+            preds_arr[start_ndx:end_ndx, 1] = prediction_arr
+            preds_arr[start_ndx:end_ndx, 2:3] = np.take_along_axis(
+                arr=probability_arr,
+                indices=prediction_arr[:, np.newaxis],
+                axis=1)
+            preds_arr[start_ndx:end_ndx, 3:] = [0, 0, 1, 1]
 
         return loss_g.mean()
 
@@ -289,48 +311,20 @@ class Runner:
         epoch_ndx,
         mode_str,
         metrics_t,
-        classification_threshold=0.5,
+        labels_arr,
+        preds_arr,
     ):
         assert torch.isfinite(metrics_t).all()
-
-        true_pos_count = metrics_t[METRICS_TP_NDX].sum().item()
-        true_neg_count = metrics_t[METRICS_TN_NDX].sum().item()
-
-        false_neg_count = metrics_t[METRICS_FN_NDX].sum().item()
-        false_pos_count = metrics_t[METRICS_FP_NDX].sum().item()
-
-        pos_label_count = true_pos_count + false_neg_count
-
-        all_examples_count = true_neg_count + true_pos_count + false_pos_count + false_neg_count
-        assert all_examples_count == metrics_t.size(1), (f'TN + TP + FP + FN == {all_examples_count} != '
-                                                         f'metrics_t.size(1) != {metrics_t.size(1)}')
 
         metrics_dict = {}
         metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
 
-        metrics_dict['percent_all/tp'] = true_pos_count / (pos_label_count) * 100
-        metrics_dict['percent_all/fn'] = false_neg_count / (pos_label_count) * 100
-        metrics_dict['percent_all/fp'] = false_pos_count / (pos_label_count) * 100
-
-        metrics_dict['pr/precision'] = true_pos_count / np.float32(true_pos_count + false_pos_count)
-        metrics_dict['pr/recall'] = true_pos_count / np.float32(true_pos_count + false_neg_count)
-        metrics_dict['pr/f1'] = 2 * true_pos_count / (2 * true_pos_count + false_pos_count + false_neg_count)
+        mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
+        metrics_dict['map/all'] = mean_ap
 
         log.info(
             ("E{} {:8} {loss/all:.4f} loss, "
-             + "{pr/precision:.4f} precision, "
-             + "{pr/recall:.4f} recall, "
-             + "{pr/f1:.4f} f1"
-             ).format(
-                epoch_ndx,
-                mode_str,
-                **metrics_dict,
-            )
-        )
-        log.info(
-            ("E{} {:8} "
-             + "{loss/all:.4f} loss, "
-             + "{percent_all/tp:-5.1f}% tp, {percent_all/fn:-5.1f}% fn, {percent_all/fp:-9.1f}% fp"
+             + "{map/all:.4f} precision, "
              ).format(
                 epoch_ndx,
                 mode_str,
@@ -347,4 +341,4 @@ class Runner:
 
         writer.flush()
 
-        return metrics_dict['pr/f1']
+        return metrics_dict['map/all']
