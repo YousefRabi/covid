@@ -3,6 +3,7 @@ from tqdm import tqdm
 
 import numpy as np
 import cv2
+from PIL import Image
 import pydicom
 
 
@@ -50,6 +51,18 @@ def read_xray(path, voi_lut=True, fix_monochrome=True, use_8bit=True, rescale_ti
         data = (data * 65535).astype(np.uint16)
 
     return data
+
+
+def resize_xray(array, size, keep_ratio=False, resample=Image.LANCZOS):
+    # Original from: https://www.kaggle.com/xhlulu/vinbigdata-process-and-resize-to-image
+    im = Image.fromarray(array)
+
+    if keep_ratio:
+        im.thumbnail((size, size), resample)
+    else:
+        im = im.resize((size, size), resample)
+
+    return im
 
 
 if __name__ == '__main__':
