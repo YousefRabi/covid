@@ -29,14 +29,15 @@ class StudyClassificationDataset(torch.utils.data.Dataset):
         self.transforms = transforms
 
         self.image_names = image_df.image_id.values + '.png'
-        self.labels = image_df.study_label.values
+        self.labels = image_df.label.values
+        self.study_ids = image_df.study_id.values
 
         if overfit_single_batch:
             self.image_names = self.image_names[:64]
 
     def __getitem__(self, idx: int) -> tuple:
         image_path = self.root / self.image_names[idx]
-        image_id = image_path.stem
+        study_id = self.study_ids[idx]
 
         try:
             image = skimage.io.imread(image_path)
@@ -52,7 +53,7 @@ class StudyClassificationDataset(torch.utils.data.Dataset):
 
         image = img2tensor(image) / 255
 
-        return image, label, image_id
+        return image, label, study_id
 
     def __len__(self):
         return len(self.image_names)
