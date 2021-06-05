@@ -194,14 +194,6 @@ class Runner:
             len(train_dl.dataset),
             device=self.device
         )
-        trn_labels_arr = np.empty(
-            (len(train_dl.dataset), 6),  # image_id, label_name, xmin, ymin, xmax, ymax
-            dtype='object',
-        )
-        trn_preds_arr = np.empty(
-            (len(train_dl.dataset), 7),  # image_id, label_name, conf, xmin, ymin, xmax, ymax
-            dtype='object',
-        )
 
         batch_iter = enumerate_with_estimate(
             train_dl,
@@ -212,13 +204,11 @@ class Runner:
         for batch_ndx, batch_tup in batch_iter:
             self.optimizer.zero_grad()
 
-            loss_var = self.compute_batch_loss(
+            loss_var, trn_labels_arr, trn_preds_arr = self.compute_batch_loss(
                 batch_ndx,
                 batch_tup,
                 train_dl.batch_size,
                 trn_metrics_g,
-                trn_labels_arr,
-                trn_preds_arr
             )
 
             self.scaler.scale(loss_var).backward()
@@ -237,14 +227,6 @@ class Runner:
                 len(val_dl.dataset),
                 device=self.device,
             )
-            val_labels_arr = np.empty(
-                (len(val_dl.dataset), 6),  # image_id, label_name, xmin, xmax, ymin, ymax
-                dtype='object',
-            )
-            val_preds_arr = np.empty(
-                (len(val_dl.dataset), 7),  # image_id, label_name, conf, xmin, xmax, ymin, ymax
-                dtype='object',
-            )
 
             batch_iter = enumerate_with_estimate(
                 val_dl,
@@ -253,25 +235,24 @@ class Runner:
             )
 
             for batch_ndx, batch_tup in batch_iter:
-                self.compute_batch_loss(
+                val_loss, val_labels_arr, val_preds_arr = self.compute_batch_loss(
                     batch_ndx,
                     batch_tup,
                     val_dl.batch_size,
                     val_metrics_g,
-                    val_labels_arr,
-                    val_preds_arr,
                 )
 
         return val_metrics_g.to('cpu'), val_labels_arr, val_preds_arr
 
-    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g, labels_arr, preds_arr):
-        input_t, label_t, image_id_list = batch_tup
+    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g):
+        input_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
-        image_id_arr = np.array(image_id_list)
 
-        id2label = {0: 'negative', 1: 'typical', 2: 'indeterminate', 3: 'atypical'}
+        study_id_arr = np.array(study_id_list)
+        labels_arr = np.empty((label_g.shape[0], 6), dtype='object')
+        preds_arr = np.empty((input_g.shape[0], 7), dtype='object')
 
         with autocast():
             logits_g = self.model(input_g)
@@ -294,19 +275,19 @@ class Runner:
 
             metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = loss_g
 
-            labels_arr[start_ndx:end_ndx, 0] = image_id_arr
-            labels_arr[start_ndx:end_ndx, 1] = [id2label[class_id] for class_id in label_g.cpu().detach().numpy()]
-            labels_arr[start_ndx:end_ndx, 2:] = [0, 1, 0, 1]
+            labels_arr[:, 0] = study_id_arr
+            labels_arr[:, 1] = label_g.cpu().detach().numpy()
+            labels_arr[:, 2:] = [0, 1, 0, 1]
 
-            preds_arr[start_ndx:end_ndx, 0] = image_id_arr
-            preds_arr[start_ndx:end_ndx, 1] = [id2label[class_id] for class_id in prediction_arr]
-            preds_arr[start_ndx:end_ndx, 2:3] = np.take_along_axis(
+            preds_arr[:, 0] = study_id_arr
+            preds_arr[:, 1] = prediction_arr
+            preds_arr[:, 2:3] = np.take_along_axis(
                 arr=probability_arr,
                 indices=prediction_arr[:, np.newaxis],
                 axis=1)
-            preds_arr[start_ndx:end_ndx, 3:] = [0, 1, 0, 1]
+            preds_arr[:, 3:] = [0, 1, 0, 1]
 
-        return loss_g.mean()
+        return loss_g.mean(), labels_arr, preds_arr
 
     def log_metrics(
         self,
