@@ -51,6 +51,9 @@ class StudyClassificationDataset(torch.utils.data.Dataset):
 
         label = torch.tensor(self.labels[idx], dtype=torch.long)
 
+        if self.transforms:
+            image = self.transforms(image=image)
+
         image = img2tensor(image) / 255
 
         return image, label, study_id
