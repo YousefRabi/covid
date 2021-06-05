@@ -303,7 +303,8 @@ class Runner:
         metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
 
         mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
-        metrics_dict['map/all'] = mean_ap
+        # Multiply by 2 /3 because LB metric is mAP and study ids have 4 labels and image ids have 2 labels
+        metrics_dict['map/all'] = mean_ap * 2 / 3
 
         log.info(
             ("E{} {:8} {loss/all:.4f} loss, "
