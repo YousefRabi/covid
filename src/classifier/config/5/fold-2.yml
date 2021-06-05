@@ -52,7 +52,7 @@ scheduler:
   name: 'plateau'
   params:
     patience: 3
-    factor: 10
+    factor: 0.2
     min_lr: 1.0e-6
 
 num_workers: 8
