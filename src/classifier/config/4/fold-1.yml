@@ -15,13 +15,13 @@ model:
     pretrained: True
 
 train:
-  batch_size: 128
+  batch_size: 64
   overfit_single_batch: False
   num_epochs: 50
   snapshots: 1
 
 test:
-  batch_size: 128
+  batch_size: 64
   cls_threshold: 0.5
   tta:
     horizontal: False
