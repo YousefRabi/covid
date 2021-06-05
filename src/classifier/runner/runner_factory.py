@@ -46,6 +46,7 @@ class Runner:
         self.val_writer = None
         self.init_tensorboard_writers()
         self.best_score = 0.0
+        self.best_loss = float('inf')
         self.total_training_samples_count = 0
 
         self.device = torch.device('cuda')
@@ -157,21 +158,22 @@ class Runner:
             if not self.config.train.overfit_single_batch:
                 val_metrics_t, labels_arr, preds_arr = self.do_validation(epoch_ndx, val_dl)
                 score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
+                val_loss = val_metrics_t[METRICS_LOSS_NDX].mean()
 
-                if score > self.best_score:
+                if val_loss < self.best_loss:
                     log.info(f'Score improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
                     save_model_with_optimizer(self.model,
                                               self.optimizer,
                                               self.scheduler,
-                                              score,
+                                              val_loss,
                                               self.config.multi_gpu,
                                               self.config.work_dir / 'checkpoints' / 'best_model.pth')
-                    self.best_score = score
+                    self.best_loss = val_loss
 
         save_model_with_optimizer(self.model,
                                   self.optimizer,
                                   self.scheduler,
-                                  score,
+                                  val_loss,
                                   self.config.multi_gpu,
                                   self.config.work_dir / 'checkpoints' / 'latest_model.pth')
 

@@ -10,8 +10,8 @@ import pandas as pd
 import torch
 
 from classifier.utils.utils import img2tensor
-
 from classifier.utils.logconf import logging
+from data_prep.convert_dicom_to_png import resize_xray
 
 
 log = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class StudyClassificationDataset(torch.utils.data.Dataset):
 
         try:
             image = skimage.io.imread(image_path)
-            image = cv2.resize(image, (self.image_resolution, self.image_resolution))
+            image = np.array(resize_xray(image, self.image_resolution))
         except Exception as e:
             log.error(f'Error {e} while reading image at {image_path}')
             raise
