@@ -164,7 +164,7 @@ def standard_aug(phase_config):
             ToTensorV2(),
         )
 
-    if phase_config.AssertShape:
+    if phase_config.AssertShape.p > 0:
         return iaa.Sequential([
             iaa.AssertShape((None, phase_config.AssertShape.height, phase_config.AssertShape.width, [1, 3]))
         ])

@@ -21,8 +21,8 @@ class StudyClassificationDataset(torch.utils.data.Dataset):
     def __init__(self,
                  image_folder: str,
                  image_df: pd.DataFrame,
-                 transforms=False,
-                 image_resolution: int = 256,
+                 transforms,
+                 image_resolution: int,
                  overfit_single_batch: bool = False):
         self.root = Path(image_folder)
         self.image_resolution = image_resolution
@@ -53,6 +53,9 @@ class StudyClassificationDataset(torch.utils.data.Dataset):
 
         if self.transforms:
             image = self.transforms(image=image)
+
+        if type(image) == dict:  # Albumentations augment
+            image = image['image']
 
         image = img2tensor(image) / 255
 

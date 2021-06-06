@@ -157,11 +157,11 @@ class Runner:
 
             if not self.config.train.overfit_single_batch:
                 val_metrics_t, labels_arr, preds_arr = self.do_validation(epoch_ndx, val_dl)
-                score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
+                self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
                 val_loss = val_metrics_t[METRICS_LOSS_NDX].mean()
 
                 if val_loss < self.best_loss:
-                    log.info(f'Score improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
+                    log.info(f'Loss improved from {self.best_loss:.6f} -> {val_loss:.6f}. Saving model.')
                     save_model_with_optimizer(self.model,
                                               self.optimizer,
                                               self.scheduler,
@@ -196,6 +196,8 @@ class Runner:
             len(train_dl.dataset),
             device=self.device
         )
+        labels_list = []
+        preds_list = []
 
         batch_iter = enumerate_with_estimate(
             train_dl,
@@ -206,11 +208,13 @@ class Runner:
         for batch_ndx, batch_tup in batch_iter:
             self.optimizer.zero_grad()
 
-            loss_var, trn_labels_arr, trn_preds_arr = self.compute_batch_loss(
+            loss_var = self.compute_batch_loss(
                 batch_ndx,
                 batch_tup,
                 train_dl.batch_size,
                 trn_metrics_g,
+                labels_list,
+                preds_list
             )
 
             self.scaler.scale(loss_var).backward()
@@ -219,7 +223,10 @@ class Runner:
 
         self.total_training_samples_count += len(train_dl.dataset)
 
-        return trn_metrics_g.to('cpu'), trn_labels_arr, trn_preds_arr
+        labels_arr = np.array(labels_list)
+        preds_arr = np.array(preds_list)
+
+        return trn_metrics_g.to('cpu'), labels_arr, preds_arr
 
     def do_validation(self, epoch_ndx, val_dl):
         with torch.no_grad():
@@ -230,6 +237,9 @@ class Runner:
                 device=self.device,
             )
 
+            labels_list = []
+            preds_list = []
+
             batch_iter = enumerate_with_estimate(
                 val_dl,
                 "E{} Validation ".format(epoch_ndx),
@@ -237,16 +247,21 @@ class Runner:
             )
 
             for batch_ndx, batch_tup in batch_iter:
-                val_loss, val_labels_arr, val_preds_arr = self.compute_batch_loss(
+                self.compute_batch_loss(
                     batch_ndx,
                     batch_tup,
                     val_dl.batch_size,
                     val_metrics_g,
+                    labels_list,
+                    preds_list
                 )
 
-        return val_metrics_g.to('cpu'), val_labels_arr, val_preds_arr
+            labels_arr = np.array(labels_list)
+            preds_arr = np.array(preds_list)
 
-    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g):
+        return val_metrics_g.to('cpu'), labels_arr, preds_arr
+
+    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g, labels_list, preds_list):
         input_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
@@ -289,7 +304,10 @@ class Runner:
                 axis=1)
             preds_arr[:, 3:] = [0, 1, 0, 1]
 
-        return loss_g.mean(), labels_arr, preds_arr
+        labels_list.append(labels_arr.tolist())
+        preds_list.append(preds_arr.tolist())
+
+        return loss_g.mean()
 
     def log_metrics(
         self,
