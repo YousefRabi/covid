@@ -17,7 +17,7 @@ model:
 train:
   batch_size: 32
   overfit_single_batch: False
-  num_epochs: 50
+  num_epochs: 10
   snapshots: 1
 
 test:
