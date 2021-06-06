@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from pathlib import Path
 from tqdm import tqdm
 
@@ -65,12 +66,25 @@ def resize_xray(array, size, keep_ratio=False, resample=Image.LANCZOS):
     return im
 
 
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument('--raw_dcm_folder')
+    parser.add_argument('--output_png_folder')
+    parser.add_argument('--use_8bit', action='store_true')
+    parser.add_argument('--div', default=1, type=int)
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_args()
+
+    convert_dicom_to_png(Path(args.raw_dcm_folder),
+                         Path(args.output_png_folder),
+                         use_8bit=args.use_8bit,
+                         div=args.div)
+
+
 if __name__ == '__main__':
-    convert_dicom_to_png(Path('data/raw/train'),
-                         Path('data/processed/train/png_div_2'),
-                         use_8bit=True,
-                         div=2)
-    convert_dicom_to_png(Path('data/raw/test'),
-                         Path('data/processed/test/png_div_2'),
-                         use_8bit=True,
-                         div=2)
+    main()
