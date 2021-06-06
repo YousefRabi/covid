@@ -222,8 +222,8 @@ class Runner:
 
         self.total_training_samples_count += len(train_dl.dataset)
 
-        labels_arr = np.squeeze(np.array(labels_list), axis=0)
-        preds_arr = np.squeeze(np.array(preds_list), axis=0)
+        labels_arr = np.array(labels_list, dtype='object')
+        preds_arr = np.array(preds_list, dtype='object')
 
         return trn_metrics_g.to('cpu'), labels_arr, preds_arr
 
@@ -303,8 +303,8 @@ class Runner:
                 axis=1)
             preds_arr[:, 3:] = [0, 1, 0, 1]
 
-        labels_list.append(labels_arr.tolist())
-        preds_list.append(preds_arr.tolist())
+        labels_list.extend(labels_arr.tolist())
+        preds_list.extend(preds_arr.tolist())
 
         return loss_g.mean()
 
