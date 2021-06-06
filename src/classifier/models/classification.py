@@ -2,7 +2,7 @@ import pretrainedmodels
 import torch
 import torch.nn as nn
 import torchvision
-from efficientnet_pytorch import EfficientNet
+import timm
 
 
 class ClassificationModel(nn.Module):
@@ -26,12 +26,9 @@ class ClassificationModel(nn.Module):
             self.net.fc = nn.Linear(self.net.fc.in_features, self.num_classes)
 
         elif 'efficientnet' in self.encoder_name:
-            if pretrained:
-                self.net = EfficientNet.from_pretrained(self.encoder_name)
-            else:
-                self.net = EfficientNet.from_name(self.encoder_name)
-            self.net._fc = nn.Linear(
-                self.net._fc.in_features, self.num_classes)
+            self.net = timm.create_model(self.encoder_name, pretrained)
+            self.net.classifier = nn.Linear(
+                self.net.classifier.in_features, self.num_classes)
 
         else:
             raise NotImplementedError(f'Model name {self.encoder_name} '
