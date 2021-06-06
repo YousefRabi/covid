@@ -6,17 +6,21 @@ from classifier.datasets.classification import StudyClassificationDataset
 
 
 def test_init():
-    image_df = pd.read_csv('data/processed/processed_image_df.csv')
+    image_df = pd.read_csv('data/processed/stratified_group_kfold_split_5_42.csv')
     dataset = StudyClassificationDataset('data/processed/train/png_div_2',
-                                         image_df)
+                                         image_df,
+                                         transforms=False,
+                                         image_resolution=256)
 
     assert isinstance(dataset, StudyClassificationDataset)
 
 
 def test_get_item():
-    image_df = pd.read_csv('data/processed/processed_image_df.csv')
+    image_df = pd.read_csv('data/processed/stratified_group_kfold_split_5_42.csv')
     dataset = StudyClassificationDataset('data/processed/train/png_div_2',
-                                         image_df)
+                                         image_df,
+                                         transforms=False,
+                                         image_resolution=256)
 
     item = dataset[0]
 

@@ -157,23 +157,22 @@ class Runner:
 
             if not self.config.train.overfit_single_batch:
                 val_metrics_t, labels_arr, preds_arr = self.do_validation(epoch_ndx, val_dl)
-                self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
-                val_loss = val_metrics_t[METRICS_LOSS_NDX].mean()
+                score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
 
-                if val_loss < self.best_loss:
-                    log.info(f'Loss improved from {self.best_loss:.6f} -> {val_loss:.6f}. Saving model.')
+                if score > self.best_score:
+                    log.info(f'Loss improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
                     save_model_with_optimizer(self.model,
                                               self.optimizer,
                                               self.scheduler,
-                                              val_loss,
+                                              score,
                                               self.config.multi_gpu,
                                               self.config.work_dir / 'checkpoints' / 'best_model.pth')
-                    self.best_loss = val_loss
+                    self.best_score = score
 
         save_model_with_optimizer(self.model,
                                   self.optimizer,
                                   self.scheduler,
-                                  val_loss,
+                                  score,
                                   self.config.multi_gpu,
                                   self.config.work_dir / 'checkpoints' / 'latest_model.pth')
 
@@ -223,8 +222,8 @@ class Runner:
 
         self.total_training_samples_count += len(train_dl.dataset)
 
-        labels_arr = np.array(labels_list)
-        preds_arr = np.array(preds_list)
+        labels_arr = np.squeeze(np.array(labels_list), axis=0)
+        preds_arr = np.squeeze(np.array(preds_list), axis=0)
 
         return trn_metrics_g.to('cpu'), labels_arr, preds_arr
 

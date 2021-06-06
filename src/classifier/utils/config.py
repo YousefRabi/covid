@@ -87,6 +87,8 @@ def _get_default_config():
     c.transforms.train.ShiftScaleRotate.shift_limit = 0.0625
     c.transforms.train.ShiftScaleRotate.scale_limit = 0.1
     c.transforms.train.ShiftScaleRotate.rotate_limit = 45
+    c.transforms.train.ShiftScaleRotate.border_mode = 'BORDER_REFLECT'
+    c.transforms.train.ShiftScaleRotate.value = 0
     c.transforms.train.CutMix = False
     c.transforms.train.Mixup = False
     c.transforms.train.Pad = edict()
