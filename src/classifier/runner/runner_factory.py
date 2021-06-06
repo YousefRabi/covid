@@ -289,7 +289,7 @@ class Runner:
             labels_arr[:, 1] = label_g.cpu().detach().numpy()
             labels_arr[:, 2:] = [0, 1, 0, 1]
 
-            preds_arr[:, 0] = study_id_arr * 4
+            preds_arr[:, 0] = np.concatenate((study_id_arr,) * 4)
             preds_arr[:, 3:] = [0, 1, 0, 1]
             preds_arr[:len(study_id_arr), 1] = 0
             preds_arr[:len(study_id_arr), 2] = probability_arr[:, 0]

@@ -10,7 +10,7 @@ data:
 model:
   arch: 'ClassificationModel'
   params:
-    encoder_name: 'efficientnet-b3'
+    encoder_name: 'efficientnet_b3'
     num_classes: 4
     pretrained: True
 
