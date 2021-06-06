@@ -268,7 +268,7 @@ class Runner:
 
         study_id_arr = np.array(study_id_list)
         labels_arr = np.empty((label_g.shape[0], 6), dtype='object')
-        preds_arr = np.empty((input_g.shape[0], 7), dtype='object')
+        preds_arr = np.empty((input_g.shape[0] * 4, 7), dtype='object')
 
         with autocast():
             logits_g = self.model(input_g)
@@ -283,25 +283,22 @@ class Runner:
         end_ndx = start_ndx + batch_size
 
         with torch.no_grad():
-            prediction_arr = np.argmax(probability_arr, axis=-1)
-
-            assert prediction_arr.shape == label_g.shape, ('prediction_arr shape: '
-                                                           f'{prediction_arr.shape} - '
-                                                           f'label_g shape: {label_g.shape}')
-
             metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = loss_g
 
             labels_arr[:, 0] = study_id_arr
             labels_arr[:, 1] = label_g.cpu().detach().numpy()
             labels_arr[:, 2:] = [0, 1, 0, 1]
 
-            preds_arr[:, 0] = study_id_arr
-            preds_arr[:, 1] = prediction_arr
-            preds_arr[:, 2:3] = np.take_along_axis(
-                arr=probability_arr,
-                indices=prediction_arr[:, np.newaxis],
-                axis=1)
+            preds_arr[:, 0] = study_id_arr * 4
             preds_arr[:, 3:] = [0, 1, 0, 1]
+            preds_arr[:len(study_id_arr), 1] = 0
+            preds_arr[:len(study_id_arr), 2] = probability_arr[:, 0]
+            preds_arr[len(study_id_arr):2*len(study_id_arr), 1] = 1
+            preds_arr[len(study_id_arr):2*len(study_id_arr), 2] = probability_arr[:, 1]
+            preds_arr[2*len(study_id_arr):3*len(study_id_arr), 1] = 2
+            preds_arr[2*len(study_id_arr):3*len(study_id_arr), 2] = probability_arr[:, 2]
+            preds_arr[3*len(study_id_arr):4*len(study_id_arr), 1] = 3
+            preds_arr[3*len(study_id_arr):4*len(study_id_arr), 2] = probability_arr[:, 3]
 
         labels_list.extend(labels_arr.tolist())
         preds_list.extend(preds_arr.tolist())
