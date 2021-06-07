@@ -46,6 +46,7 @@ class Runner:
         self.val_writer = None
         self.init_tensorboard_writers()
         self.best_score = 0.0
+        self.best_loss = float('inf')
         self.total_training_samples_count = 0
 
         self.device = torch.device('cuda')
@@ -159,7 +160,7 @@ class Runner:
                 score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
 
                 if score > self.best_score:
-                    log.info(f'Score improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
+                    log.info(f'Loss improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
                     save_model_with_optimizer(self.model,
                                               self.optimizer,
                                               self.scheduler,
@@ -194,6 +195,8 @@ class Runner:
             len(train_dl.dataset),
             device=self.device
         )
+        labels_list = []
+        preds_list = []
 
         batch_iter = enumerate_with_estimate(
             train_dl,
@@ -204,11 +207,13 @@ class Runner:
         for batch_ndx, batch_tup in batch_iter:
             self.optimizer.zero_grad()
 
-            loss_var, trn_labels_arr, trn_preds_arr = self.compute_batch_loss(
+            loss_var = self.compute_batch_loss(
                 batch_ndx,
                 batch_tup,
                 train_dl.batch_size,
                 trn_metrics_g,
+                labels_list,
+                preds_list
             )
 
             self.scaler.scale(loss_var).backward()
@@ -217,7 +222,10 @@ class Runner:
 
         self.total_training_samples_count += len(train_dl.dataset)
 
-        return trn_metrics_g.to('cpu'), trn_labels_arr, trn_preds_arr
+        labels_arr = np.array(labels_list, dtype='object')
+        preds_arr = np.array(preds_list, dtype='object')
+
+        return trn_metrics_g.to('cpu'), labels_arr, preds_arr
 
     def do_validation(self, epoch_ndx, val_dl):
         with torch.no_grad():
@@ -228,6 +236,9 @@ class Runner:
                 device=self.device,
             )
 
+            labels_list = []
+            preds_list = []
+
             batch_iter = enumerate_with_estimate(
                 val_dl,
                 "E{} Validation ".format(epoch_ndx),
@@ -235,16 +246,21 @@ class Runner:
             )
 
             for batch_ndx, batch_tup in batch_iter:
-                val_loss, val_labels_arr, val_preds_arr = self.compute_batch_loss(
+                self.compute_batch_loss(
                     batch_ndx,
                     batch_tup,
                     val_dl.batch_size,
                     val_metrics_g,
+                    labels_list,
+                    preds_list
                 )
 
-        return val_metrics_g.to('cpu'), val_labels_arr, val_preds_arr
+            labels_arr = np.array(labels_list)
+            preds_arr = np.array(preds_list)
 
-    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g):
+        return val_metrics_g.to('cpu'), labels_arr, preds_arr
+
+    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g, labels_list, preds_list):
         input_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
@@ -252,7 +268,7 @@ class Runner:
 
         study_id_arr = np.array(study_id_list)
         labels_arr = np.empty((label_g.shape[0], 6), dtype='object')
-        preds_arr = np.empty((input_g.shape[0], 7), dtype='object')
+        preds_arr = np.empty((input_g.shape[0] * 4, 7), dtype='object')
 
         with autocast():
             logits_g = self.model(input_g)
@@ -267,27 +283,27 @@ class Runner:
         end_ndx = start_ndx + batch_size
 
         with torch.no_grad():
-            prediction_arr = np.argmax(probability_arr, axis=-1)
-
-            assert prediction_arr.shape == label_g.shape, ('prediction_arr shape: '
-                                                           f'{prediction_arr.shape} - '
-                                                           f'label_g shape: {label_g.shape}')
-
             metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = loss_g
 
             labels_arr[:, 0] = study_id_arr
             labels_arr[:, 1] = label_g.cpu().detach().numpy()
             labels_arr[:, 2:] = [0, 1, 0, 1]
 
-            preds_arr[:, 0] = study_id_arr
-            preds_arr[:, 1] = prediction_arr
-            preds_arr[:, 2:3] = np.take_along_axis(
-                arr=probability_arr,
-                indices=prediction_arr[:, np.newaxis],
-                axis=1)
+            preds_arr[:, 0] = np.concatenate((study_id_arr,) * 4)
             preds_arr[:, 3:] = [0, 1, 0, 1]
+            preds_arr[:len(study_id_arr), 1] = 0
+            preds_arr[:len(study_id_arr), 2] = probability_arr[:, 0]
+            preds_arr[len(study_id_arr):2*len(study_id_arr), 1] = 1
+            preds_arr[len(study_id_arr):2*len(study_id_arr), 2] = probability_arr[:, 1]
+            preds_arr[2*len(study_id_arr):3*len(study_id_arr), 1] = 2
+            preds_arr[2*len(study_id_arr):3*len(study_id_arr), 2] = probability_arr[:, 2]
+            preds_arr[3*len(study_id_arr):4*len(study_id_arr), 1] = 3
+            preds_arr[3*len(study_id_arr):4*len(study_id_arr), 2] = probability_arr[:, 3]
 
-        return loss_g.mean(), labels_arr, preds_arr
+        labels_list.extend(labels_arr.tolist())
+        preds_list.extend(preds_arr.tolist())
+
+        return loss_g.mean()
 
     def log_metrics(
         self,
