@@ -313,7 +313,7 @@ class Runner:
         labels_arr,
         preds_arr,
     ):
-        assert torch.isfinite(metrics_t).all()
+        # assert torch.isfinite(metrics_t).all()
 
         metrics_dict = {}
         metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
