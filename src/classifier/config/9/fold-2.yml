@@ -1,0 +1,67 @@
+data:
+  data_dir: 'data/processed/train/png_div_2'
+  folds_df: 'data/processed/stratified_group_kfold_split_5_42.csv'
+  num_classes: 4
+  idx_fold: 2
+  num_folds: 5
+  dataset_name: 'StudyClassificationDataset'
+  image_resolution: 512
+
+model:
+  arch: 'ClassificationModel'
+  params:
+    encoder_name: 'efficientnet_b3'
+    num_classes: 4
+    pretrained: True
+
+train:
+  batch_size: 32
+  overfit_single_batch: False
+  num_epochs: 10
+  snapshots: 1
+
+test:
+  batch_size: 32
+  cls_threshold: 0.5
+  tta:
+    horizontal: False
+    vertical: False
+
+transforms:
+  train:
+    HorizontalFlip: True
+    VerticalFlip: True
+    Transpose: True
+    BrightnessContrast:
+      p: 0.3
+    HueSaturationValue:
+      p: 0.2
+    Blur: True
+    Noise: True
+    ShiftScaleRotate:
+      p: 0.3
+
+  test:
+    AssertShape:
+      p: 1.0
+      height: 512
+      width: 512
+
+loss:
+  name: "CrossEntropy"
+  params:
+    reduction: 'none'
+
+optimizer:
+  name: 'Adam'
+  params:
+    lr: 0.001
+
+scheduler:
+  name: ''
+
+num_workers: 8
+device: 'cuda:0'
+multi_gpu: False
+debug: False
+work_dir: 'build/'
