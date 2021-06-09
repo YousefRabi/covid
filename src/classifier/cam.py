@@ -22,6 +22,7 @@ from classifier.utils.config import load_config
 from classifier.models.model_factory import get_model
 from classifier.datasets.dataset_factory import get_dataloader
 from classifier.transforms.transform_factory import get_transforms
+from data_prep.convert_dicom_to_png import resize_xray
 
 
 def get_args():
@@ -78,6 +79,8 @@ if __name__ == '__main__':
     config = load_config(args.config)
     model = get_model(config)
     model.load_state_dict(torch.load(args.weights)['model_state_dict'])
+    model.eval()
+    model.float()
 
     # Choose the target layer you want to compute the visualization for.
     # Usually this will be the last convolutional layer in the model.
@@ -86,7 +89,7 @@ if __name__ == '__main__':
     # VGG, densenet161: model.features[-1]
     # mnasnet1_0: model.layers[-1]
     # You can print the model to help chose the layer
-    target_layer = model.net._blocks[-1]  # This is for EfficientNets
+    target_layer = model.net.blocks[-1]  # This is for EfficientNets
 
     cam = methods[args.method](model=model,
                                target_layer=target_layer,
@@ -95,9 +98,10 @@ if __name__ == '__main__':
     input_tensor = []
     img_names = []
 
-    for img_path in Path(args.image_path).iterdir():
+    img_paths = list(Path(args.image_path).iterdir())
+    for img_path in img_paths:
         rgb_img = cv2.imread(img_path.as_posix(), 1)[:, :, ::-1]
-        rgb_img = cv2.resize(rgb_img, (config.data.image_resolution, config.data.image_resolution))
+        rgb_img = np.array(resize_xray(rgb_img, config.data.image_resolution))
         rgb_img = np.float32(rgb_img) / 255
         img_t = preprocess_image(rgb_img,
                                  mean=[0, 0, 0],
