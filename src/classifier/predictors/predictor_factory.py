@@ -2,6 +2,7 @@ from easydict import EasyDict
 from collections import defaultdict
 
 import pandas as pd
+import numpy as np
 
 import torch
 
@@ -111,11 +112,20 @@ class Predictor:
         preds_list = []
 
         for study_id, study_preds in preds_dict.items():
-            for study_pred in study_preds:
-                for label in range(4):
-                    preds_list.append([study_id, label, study_pred[label], 0, 1, 0, 1])
+            study_pred = np.mean(study_preds, axis=0)
+            preds_list.append([study_id] + study_pred.tolist())
 
         preds_df = pd.DataFrame(preds_list)
-        preds_df.columns = ['study_id', 'label', 'conf', 'xmin', 'xmax', 'ymin', 'ymax']
+        preds_df.columns = ['study_id', 'negative', 'typical', 'indeterminate', 'atypical']
+        preds_df['label'] = preds_df['study_id'].apply(
+            lambda x: self.df[self.df['study_id'] == x]['label'].values[0]
+        )
+        preds_df['pred_label'] = np.argmax(
+            preds_df[['negative', 'typical',
+                      'indeterminate', 'atypical']].values, axis=1
+        )
+        preds_df['fold'] = preds_df['study_id'].apply(
+            lambda x: self.df[self.df['study_id'] == x]['fold'].values[0]
+        )
 
         return preds_df
