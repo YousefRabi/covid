@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from pathlib import Path
+import shutil
 
 import torch
 import numpy as np
@@ -17,10 +18,18 @@ def main():
     args = parse_args()
 
     scores = {}
+
+    fold_models_dir = Path(args.fold_models_dir)
+    all_folds_dir = fold_models_dir / 'all_folds'
+    all_folds_dir.mkdir(parents=True, exist_ok=True)
+
     for fold_model_path in Path(args.fold_models_dir).rglob('*.pth'):
-        fold = fold_model_path.stem
-        score = torch.load(fold_model_path)['best_score']
-        scores[fold] = score
+        if fold_model_path.stem == 'best_model':
+            print('fold_model_path: ', fold_model_path)
+            fold = fold_model_path.parent.parent.stem
+            score = torch.load(fold_model_path)['best_score']
+            shutil.copy(fold_model_path, all_folds_dir / f'{fold}.pth')
+            scores[fold] = score
 
     for fold, score in scores.items():
         print(f'{fold} -- {score}')

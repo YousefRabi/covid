@@ -28,7 +28,7 @@ class StudyClassificationDataset(torch.utils.data.Dataset):
         self.image_resolution = image_resolution
         self.transforms = transforms
 
-        self.image_names = image_df.image_id.values + '.png'
+        self.image_names = image_df.image_id.values + '.jpg'
         self.labels = image_df.label.values
         self.study_ids = image_df.study_id.values
 
