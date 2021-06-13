@@ -1,9 +1,14 @@
+from collections import defaultdict
 from pathlib import Path
+import shutil
 import argparse
 import cv2
+from tqdm import tqdm
+
+import pandas as pd
 import numpy as np
+
 import torch
-from torchvision import models
 
 from pytorch_grad_cam import GradCAM, \
                              ScoreCAM, \
@@ -13,16 +18,11 @@ from pytorch_grad_cam import GradCAM, \
                              EigenCAM, \
                              EigenGradCAM
 
-from pytorch_grad_cam import GuidedBackpropReLUModel
 from pytorch_grad_cam.utils.image import show_cam_on_image, \
-                                         deprocess_image, \
                                          preprocess_image
 
 from classifier.utils.config import load_config
 from classifier.models.model_factory import get_model
-from classifier.datasets.dataset_factory import get_dataloader
-from classifier.transforms.transform_factory import get_transforms
-from data_prep.convert_dicom_to_png import resize_xray
 
 
 def get_args():
@@ -31,8 +31,11 @@ def get_args():
     parser.add_argument('--weights', help="Trained model's weights file.")
     parser.add_argument('--use-cuda', action='store_true', default=False,
                         help='Use NVIDIA GPU acceleration')
-    parser.add_argument('--image_path', type=str)
-    parser.add_argument('--output_path', type=str, default='./grad-cam-output',
+    parser.add_argument('--images_folder', type=str)
+    parser.add_argument('--preds_csv', type=str)
+    parser.add_argument('--fold', type=int, required=True)
+    parser.add_argument('--num_classes', type=int, required=True)
+    parser.add_argument('--output_folder', type=str, default='./grad-cam-output',
                         help='Output image path')
     parser.add_argument('--aug_smooth', action='store_true',
                         help='Apply test time augmentation to smooth the CAM')
@@ -55,7 +58,49 @@ def get_args():
     return args
 
 
-if __name__ == '__main__':
+def prepare_images(images_folder: Path, preds_df: pd.DataFrame, output_folder: Path, fold: int, num_classes: int):
+    study_id_list = get_study_ids_for_grad_cam(preds_df, fold, num_classes)
+    test_image_paths = list(Path('/home/yousef/deep-learning/kaggle/covid/data/raw/train').rglob('*.dcm'))
+    study2image_dict = defaultdict(list)
+    for test_image_path in test_image_paths:
+        study2image_dict[test_image_path.parent.parent.stem].append(test_image_path.stem)
+
+    images_folder = Path(images_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
+    for study_id in study_id_list:
+        image_ids = study2image_dict[study_id]
+        for image_id in image_ids:
+            shutil.copy(images_folder / (image_id + '.jpg'), output_folder / (image_id + '.jpg'))
+
+
+def get_study_ids_for_grad_cam(df, fold, num_classes):
+    study_id_list = []
+    for label in range(num_classes):
+        for pred_label in range(num_classes):
+            study_ids = df.loc[
+                (df['label'] == label) & (df['pred_label'] == pred_label) & (df['fold'] != fold), 'study_id'].values
+
+            try:
+                study_ids = np.random.choice(study_ids, size=2)
+            except ValueError:
+                print(f'No image ids for label {label} and pred {pred_label} for train')
+
+            study_id_list.extend(study_ids)
+
+            study_ids = df.loc[
+                (df['label'] == label) & (df['pred_label'] == pred_label) & (df['fold'] == fold), 'study_id'].values
+
+            try:
+                study_ids = np.random.choice(study_ids, size=2)
+            except ValueError:
+                print(f'No image ids for label {label} and pred {pred_label} for valid')
+
+            study_id_list.extend(study_ids)
+
+    return study_id_list
+
+
+def main():
     """ python cam.py -image-path <path_to_image>
     Example usage of loading an image, and computing:
         1. CAM
@@ -73,14 +118,25 @@ if __name__ == '__main__':
          "eigencam": EigenCAM,
          "eigengradcam": EigenGradCAM}
 
-    output_path = Path(args.output_path)
-    output_path.mkdir(parents=True, exist_ok=True)
+    output_folder = Path(args.output_folder)
+    images_folder = Path(args.images_folder)
+    original_images_folder = output_folder / 'original_images'
+    test_image_paths = Path('/home/yousef/deep-learning/kaggle/covid/data/raw/train').rglob('*.dcm')
+    image2study_dict = {
+        test_image_path.stem: test_image_path.parent.parent.stem for test_image_path in test_image_paths
+    }
+
+    try:
+        shutil.rmtree(original_images_folder)
+    except FileNotFoundError:
+        pass
+
+    preds_df = pd.read_csv(args.preds_csv)
+    prepare_images(images_folder, preds_df, original_images_folder, args.fold, args.num_classes)
 
     config = load_config(args.config)
     model = get_model(config)
     model.load_state_dict(torch.load(args.weights)['model_state_dict'])
-    model.eval()
-    model.float()
 
     # Choose the target layer you want to compute the visualization for.
     # Usually this will be the last convolutional layer in the model.
@@ -98,10 +154,14 @@ if __name__ == '__main__':
     input_tensor = []
     img_names = []
 
-    img_paths = list(Path(args.image_path).iterdir())
-    for img_path in img_paths:
-        rgb_img = cv2.imread(img_path.as_posix(), 1)[:, :, ::-1]
-        rgb_img = np.array(resize_xray(rgb_img, config.data.image_resolution))
+    for img_path in Path(output_folder / 'original_images').iterdir():
+        try:
+            rgb_img = cv2.imread(img_path.as_posix(), 1)[:, :, ::-1]
+        except Exception as e:
+            print(f'Exception {e} while reading image at {img_path.as_posix()}')
+            raise
+
+        rgb_img = cv2.resize(rgb_img, (config.data.image_resolution, config.data.image_resolution))
         rgb_img = np.float32(rgb_img) / 255
         img_t = preprocess_image(rgb_img,
                                  mean=[0, 0, 0],
@@ -118,12 +178,17 @@ if __name__ == '__main__':
 
     # AblationCAM and ScoreCAM have batched implementations.
     # You can override the internal batch size for faster computation.
-    cam.batch_size = 32
 
-    grayscale_cams = cam(input_tensor=input_tensor,
-                         target_category=target_category,
-                         aug_smooth=args.aug_smooth,
-                         eigen_smooth=args.eigen_smooth)
+    grayscale_cams = []
+
+    for tensor in input_tensor:
+        tensor = tensor.unsqueeze(0)
+        grayscale_cam = cam(input_tensor=tensor,
+                            target_category=target_category,
+                            aug_smooth=args.aug_smooth,
+                            eigen_smooth=args.eigen_smooth)
+
+        grayscale_cams.extend(grayscale_cam)
 
     for grayscale_cam, img_t, img_name in zip(grayscale_cams, input_tensor, img_names):
         rgb_img = img_t.permute(1, 2, 0).numpy()
@@ -133,13 +198,44 @@ if __name__ == '__main__':
         # cam_image is RGB encoded whereas "cv2.imwrite" requires BGR encoding.
         cam_image = cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR)
 
-        gb_model = GuidedBackpropReLUModel(model=model, use_cuda=args.use_cuda)
-        gb = gb_model(img_t[None, ...], target_category=target_category)
+        study_id = image2study_dict[img_name.split('.')[0]]
+        label = preds_df.loc[preds_df['study_id'] == study_id, 'label'].values[0]
+        preds = preds_df.loc[preds_df['study_id'] == study_id][
+            ['negative', 'typical', 'indeterminate', 'atypical']].values[0]
 
-        cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
-        cam_gb = deprocess_image(cam_mask * gb)
-        gb = deprocess_image(gb)
+        cv2.putText(
+            cam_image,
+            f'Label {label}',
+            (10, 30),
+            cv2.FONT_HERSHEY_COMPLEX,
+            0.75,
+            (0, 255, 0),
+            1
+        )
 
-        cv2.imwrite((output_path / f'{args.method}_cam_{img_name}').as_posix(), cam_image)
-        cv2.imwrite((output_path / f'{args.method}_gb_{img_name}').as_posix(), gb)
-        cv2.imwrite((output_path / f'{args.method}_cam_gb_{img_name}').as_posix(), cam_gb)
+        cv2.putText(
+            cam_image,
+            f'Pred {np.argmax(preds)}',
+            (10, 50),
+            cv2.FONT_HERSHEY_COMPLEX,
+            0.75,
+            (0, 255, 0),
+            1
+        )
+
+        probs = [round(pred, 2) for pred in preds]
+        cv2.putText(
+            cam_image,
+            f'Probs {probs}',
+            (10, 70),
+            cv2.FONT_HERSHEY_COMPLEX,
+            0.75,
+            (0, 255, 0),
+            1
+        )
+
+        cv2.imwrite((output_folder / f'{args.method}_cam_{img_name}').as_posix(), cam_image)
+
+
+if __name__ == '__main__':
+    main()

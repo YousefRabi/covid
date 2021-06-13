@@ -23,7 +23,7 @@ def _get_default_config():
     c.train.overfit_single_batch = False
     c.train.resume = 0
     c.train.num_epochs = 50
-    c.train.accumulation_size = 0
+    c.train.accumulation_steps = 1
     c.train.checkpoint_path = ''
 
     c.test = edict()
