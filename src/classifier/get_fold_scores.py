@@ -33,8 +33,8 @@ def main():
 
     for fold, score in scores.items():
         print(f'{fold} -- {score}')
-    print(f'avg CV. -- {np.mean(scores.values())}')
-    print(f'std CV. -- {np.std(scores.values())}')
+    print(f'avg CV. -- {np.mean(list(scores.values()))}')
+    print(f'std CV. -- {np.std(list(scores.values()))}')
 
 
 if __name__ == '__main__':
