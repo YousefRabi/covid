@@ -15,7 +15,7 @@ class SegmentationModel(nn.Module):
         self.b0 = nn.Sequential(
             net.conv_stem,
             net.bn1,
-            net.act,
+            net.act1,
         )
         self.b1 = net.blocks[0]
         self.b2 = net.blocks[1]
@@ -41,23 +41,23 @@ class SegmentationModel(nn.Module):
             nn.Conv2d(128, 1, kernel_size=1, padding=0),
         )
 
-        def forward(self, x):
-            x = self.b0(x)
-            x = self.b1(x)
-            x = self.b2(x)
-            x = self.b3(x)
-            x = self.b4(x)
-            x = self.b5(x)
+    def forward(self, x):
+        x = self.b0(x); print('x shape: ', x.shape)
+        x = self.b1(x); print('x shape: ', x.shape)
+        x = self.b2(x); print('x shape: ', x.shape)
+        x = self.b3(x); print('x shape: ', x.shape)
+        x = self.b4(x); print('x shape: ', x.shape)
+        x = self.b5(x); print('x shape: ', x.shape)
 
-            mask = self.mask(x)
+        mask = self.mask(x); print('mask shape: ', mask.shape)
 
-            x = self.b6(x)
-            x = self.b7(x)
-            x = self.b8(x)
-            x = F.adaptive_avg_pool2d(x, 1)
-            logit = self.logit(x)
+        x = self.b6(x); print('x shape: ', x.shape)
+        x = self.b7(x); print('x shape: ', x.shape)
+        x = self.b8(x); print('x shape: ', x.shape)
+        x = F.adaptive_avg_pool2d(x, 1).squeeze(); print('x shape: ', x.shape)
+        logit = self.logit(x); print('logit shape: ', x.shape)
 
-            return logit, mask
+        return logit, mask
 
 
 class MultiClsModels:
