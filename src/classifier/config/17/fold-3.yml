@@ -58,7 +58,12 @@ optimizer:
     lr: 1
 
 scheduler:
-  name: ''
+  name: 'onecycle'
+  params:
+    max_lr: 0.001
+    div_factor: 10
+    pct_start: 0.3
+    final_div_factor: 100
 
 num_workers: 8
 device: 'cuda:0'
