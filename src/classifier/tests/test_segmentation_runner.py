@@ -16,7 +16,7 @@ def runner():
     except FileNotFoundError:
         pass
 
-    config = load_config('src/classifier/tests/data/config.yml')
+    config = load_config('src/classifier/tests/data/config_segmentation.yml')
     config.work_dir = 'build/'
     config.experiment_version = 'test'
     config.exp_name = 'test'
@@ -29,10 +29,11 @@ def test_init_model(runner):
     rand_input = torch.randint(low=0, high=255, size=(1, 3, 256, 256))
     rand_input = rand_input.to('cuda').float()
 
-    output = model(rand_input)
+    logit, mask = model(rand_input)
 
-    assert isinstance(output, torch.Tensor)
-    assert 0 <= torch.argmax(output) <= 3
+    assert isinstance(logit, torch.Tensor)
+    assert 0 <= torch.argmax(logit) <= 3
+    assert mask.shape == (1, 1, 256, 256)
 
 
 def test_run():
