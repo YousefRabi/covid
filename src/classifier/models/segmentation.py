@@ -42,20 +42,20 @@ class SegmentationModel(nn.Module):
         )
 
     def forward(self, x):
-        x = self.b0(x); print('x shape: ', x.shape)
-        x = self.b1(x); print('x shape: ', x.shape)
-        x = self.b2(x); print('x shape: ', x.shape)
-        x = self.b3(x); print('x shape: ', x.shape)
-        x = self.b4(x); print('x shape: ', x.shape)
-        x = self.b5(x); print('x shape: ', x.shape)
+        x = self.b0(x)
+        x = self.b1(x)
+        x = self.b2(x)
+        x = self.b3(x)
+        x = self.b4(x)
+        x = self.b5(x)
 
-        mask = self.mask(x); print('mask shape: ', mask.shape)
+        mask = self.mask(x)
 
-        x = self.b6(x); print('x shape: ', x.shape)
-        x = self.b7(x); print('x shape: ', x.shape)
-        x = self.b8(x); print('x shape: ', x.shape)
-        x = F.adaptive_avg_pool2d(x, 1).squeeze(); print('x shape: ', x.shape)
-        logit = self.logit(x); print('logit shape: ', x.shape)
+        x = self.b6(x)
+        x = self.b7(x)
+        x = self.b8(x)
+        x = F.adaptive_avg_pool2d(x, 1).squeeze()
+        logit = self.logit(x)
 
         return logit, mask
 
