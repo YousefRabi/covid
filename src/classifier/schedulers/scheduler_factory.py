@@ -61,7 +61,7 @@ class SchedulerBuilder:
 
     def onecycle(self):
         scheduler = OneCycleLR(self.optimizer,
-                               total_steps=self.config.train.max_num_steps,
+                               total_steps=self.total_iterations,
                                max_lr=self.config.scheduler.params.max_lr,
                                div_factor=self.config.scheduler.params.div_factor,
                                pct_start=self.config.scheduler.params.pct_start,
