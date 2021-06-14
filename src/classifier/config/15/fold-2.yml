@@ -1,5 +1,5 @@
 data:
-  data_dir: 'data/processed/train/png_div_2'
+  data_dir: 'data/processed/train/lung_crops/lung'
   folds_df: 'data/processed/stratified_group_kfold_split_5_42.csv'
   num_classes: 4
   idx_fold: 2
