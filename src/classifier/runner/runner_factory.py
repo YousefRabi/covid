@@ -54,13 +54,18 @@ class Runner:
         self.trn_transforms = get_transforms(config.transforms.train)
         self.val_transforms = get_transforms(config.transforms.test)
 
+        self.train_dl = self.init_train_dl()
+        self.val_dl = self.init_val_dl()
+
         self.model = self.init_model()
         self.optimizer = self.init_optimizer()
 
         loss_builder = LossBuilder(config)
         self.loss_func = loss_builder.get_loss()
 
-        scheduler_builder = SchedulerBuilder(self.optimizer, config)
+        scheduler_builder = SchedulerBuilder(self.optimizer,
+                                             config,
+                                             len(self.train_dl.dataset))
         self.scheduler = scheduler_builder.get_scheduler()
 
         self.scaler = torch.cuda.amp.GradScaler()
@@ -138,25 +143,23 @@ class Runner:
     def run(self):
         log.info("Starting {}, {}".format(type(self).__name__, self.config))
 
-        train_dl = self.init_train_dl()
-        val_dl = self.init_val_dl()
-
         score = 0.0
         for epoch_ndx in range(1, self.config.train.num_epochs + 1):
 
             log.info("Epoch {} of {}, {}/{} batches of size {}".format(
                 epoch_ndx,
                 self.config.train.num_epochs,
-                len(train_dl),
-                len(val_dl),
+                len(self.train_dl),
+                len(self.val_dl),
                 self.config.train.batch_size,
             ))
 
-            trn_metrics_t, labels_arr, preds_arr = self.do_training(epoch_ndx, train_dl)
+            log.info(f'LR - {self.optimizer.param_groups[0]["lr"]}')
+            trn_metrics_t, labels_arr, preds_arr = self.do_training(epoch_ndx)
             self.log_metrics(epoch_ndx, 'trn', trn_metrics_t, labels_arr, preds_arr)
 
             if not self.config.train.overfit_single_batch:
-                val_metrics_t, labels_arr, preds_arr = self.do_validation(epoch_ndx, val_dl)
+                val_metrics_t, labels_arr, preds_arr = self.do_validation(epoch_ndx)
                 score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
 
                 if score > self.best_score:
@@ -188,20 +191,20 @@ class Runner:
 
         return trn_loss
 
-    def do_training(self, epoch_ndx, train_dl):
+    def do_training(self, epoch_ndx):
         self.model.train()
         trn_metrics_g = torch.zeros(
             METRICS_SIZE,
-            len(train_dl.dataset),
+            len(self.train_dl.dataset),
             device=self.device
         )
         labels_list = []
         preds_list = []
 
         batch_iter = enumerate_with_estimate(
-            train_dl,
+            self.train_dl,
             "E{} Training".format(epoch_ndx),
-            start_ndx=train_dl.num_workers,
+            start_ndx=self.train_dl.num_workers,
         )
 
         for batch_ndx, batch_tup in batch_iter:
@@ -210,7 +213,7 @@ class Runner:
             loss_var = self.compute_batch_loss(
                 batch_ndx,
                 batch_tup,
-                train_dl.batch_size,
+                self.train_dl.batch_size,
                 trn_metrics_g,
                 labels_list,
                 preds_list
@@ -220,19 +223,22 @@ class Runner:
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-        self.total_training_samples_count += len(train_dl.dataset)
+            if self.config.scheduler.name == 'onecycle':
+                self.scheduler.step()
+
+        self.total_training_samples_count += len(self.train_dl.dataset)
 
         labels_arr = np.array(labels_list, dtype='object')
         preds_arr = np.array(preds_list, dtype='object')
 
         return trn_metrics_g.to('cpu'), labels_arr, preds_arr
 
-    def do_validation(self, epoch_ndx, val_dl):
+    def do_validation(self, epoch_ndx):
         with torch.no_grad():
             self.model.eval()
             val_metrics_g = torch.zeros(
                 METRICS_SIZE,
-                len(val_dl.dataset),
+                len(self.val_dl.dataset),
                 device=self.device,
             )
 
@@ -240,16 +246,16 @@ class Runner:
             preds_list = []
 
             batch_iter = enumerate_with_estimate(
-                val_dl,
+                self.val_dl,
                 "E{} Validation ".format(epoch_ndx),
-                start_ndx=val_dl.num_workers,
+                start_ndx=self.val_dl.num_workers,
             )
 
             for batch_ndx, batch_tup in batch_iter:
                 self.compute_batch_loss(
                     batch_ndx,
                     batch_tup,
-                    val_dl.batch_size,
+                    self.val_dl.batch_size,
                     val_metrics_g,
                     labels_list,
                     preds_list
