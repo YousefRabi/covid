@@ -5,23 +5,23 @@ data:
   idx_fold: 4
   num_folds: 5
   dataset_name: 'StudyClassificationDataset'
-  image_resolution: 456
+  image_resolution: 528
 
 model:
   arch: 'ClassificationModel'
   params:
-    encoder_name: 'efficientnet_b5'
+    encoder_name: 'efficientnet_b6'
     num_classes: 4
     pretrained: True
 
 train:
-  batch_size: 32
+  batch_size: 64
   overfit_single_batch: False
-  num_epochs: 75
+  num_epochs: 15
   snapshots: 1
 
 test:
-  batch_size: 32
+  batch_size: 64
   cls_threshold: 0.5
   tta:
     horizontal: False
@@ -44,8 +44,8 @@ transforms:
   test:
     AssertShape:
       p: 1.0
-      height: 456
-      width: 456
+      height: 528
+      width: 528
 
 loss:
   name: "CrossEntropy"
