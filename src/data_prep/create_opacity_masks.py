@@ -38,7 +38,7 @@ def main():
         lung_image = skimage.io.imread(lung_images_dir / (image_id + '.jpg'))
 
         if str(row['boxes']) == 'nan':
-            opacity_mask = np.zeros_like(lung_image, dtype=np.uint8)
+            opacity_mask = np.zeros(lung_image.shape[:2], dtype=np.uint8)
             skimage.io.imsave(opacity_masks_dir / (image_id + '.png'), opacity_mask)
             continue
 

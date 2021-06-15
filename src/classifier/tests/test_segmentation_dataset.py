@@ -27,8 +27,8 @@ def test_get_item():
     item = dataset[0]
 
     image = item[0]
-    label = item[1]
-    mask = item[2]
+    mask = item[1]
+    label = item[2]
 
     assert isinstance(image, torch.Tensor)
     assert image.shape == (3, 256, 256)
