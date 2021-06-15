@@ -169,4 +169,4 @@ def standard_aug(phase_config):
             iaa.AssertShape((None, phase_config.AssertShape.height, phase_config.AssertShape.width, [1, 3]))
         ])
 
-    return Compose(list_transforms)
+    return Compose(list_transforms) if list_transforms else False
