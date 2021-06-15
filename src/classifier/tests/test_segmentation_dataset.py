@@ -32,7 +32,7 @@ def test_get_item():
 
     assert isinstance(image, torch.Tensor)
     assert image.shape == (3, 256, 256)
-    assert mask.shape == (1, 256, 256)
+    assert mask.shape == (1, 32, 32)
 
     assert mask.max() <= 1
     assert mask.min() >= 0

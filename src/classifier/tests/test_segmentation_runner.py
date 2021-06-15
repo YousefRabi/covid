@@ -26,14 +26,14 @@ def runner():
 
 def test_init_model(runner):
     model = runner.init_model()
-    rand_input = torch.randint(low=0, high=255, size=(1, 3, 256, 256))
+    rand_input = torch.randint(low=0, high=255, size=(1, 3, 512, 512))
     rand_input = rand_input.to('cuda').float()
 
     logit, mask = model(rand_input)
 
     assert isinstance(logit, torch.Tensor)
     assert 0 <= torch.argmax(logit) <= 3
-    assert mask.shape == (1, 1, 256, 256)
+    assert mask.shape == (1, 1, 32, 32)
 
 
 def test_run():
@@ -44,7 +44,7 @@ def test_run():
     except FileNotFoundError:
         pass
 
-    config = load_config('src/classifier/tests/data/config.yml')
+    config = load_config('src/classifier/tests/data/config_segmentation.yml')
     config.experiment_version = 'test'
     config.exp_name = 'test'
     config.train.num_epochs = 1
@@ -63,7 +63,7 @@ def test_run_loss_decrease():
     except FileNotFoundError:
         pass
 
-    config = load_config('src/classifier/tests/data/config.yml')
+    config = load_config('src/classifier/tests/data/config_segmentation.yml')
     config.experiment_version = 'test'
     config.exp_name = 'test'
     config.train.num_epochs = 1

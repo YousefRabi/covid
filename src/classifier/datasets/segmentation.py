@@ -45,7 +45,7 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
             image = skimage.io.imread(image_path)
             mask = skimage.io.imread(mask_path)[..., 0]
             image = np.array(resize_xray(image, self.image_resolution))
-            mask = np.array(resize_xray(mask, self.image_resolution))
+            mask = np.array(resize_xray(mask, 32))
         except Exception as e:
             log.error(f'Error {e} while reading image at {image_path}')
             raise
