@@ -9,7 +9,7 @@ data:
   image_resolution: 512
 
 model:
-  arch: 'ClassificationModel'
+  arch: 'SegmentationModel'
   params:
     encoder_name: 'efficientnet_b3'
     num_classes: 4
