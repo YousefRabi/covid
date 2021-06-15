@@ -42,12 +42,6 @@ transforms:
     ShiftScaleRotate:
       p: 0.3
 
-  test:
-    AssertShape:
-      p: 1.0
-      height: 512
-      width: 512
-
 loss:
   name: "CrossEntropy"
   params:
