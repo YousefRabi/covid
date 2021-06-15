@@ -1,4 +1,5 @@
 from .classification import ClassificationModel
+from .segmentation import SegmentationModel
 
 from classifier.utils.logconf import logging
 
