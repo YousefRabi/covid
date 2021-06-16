@@ -42,6 +42,8 @@ class SegmentationModel(nn.Module):
         )
 
     def forward(self, x):
+        batch_size = len(x)
+
         x = self.b0(x)
         x = self.b1(x)
         x = self.b2(x)
@@ -54,7 +56,7 @@ class SegmentationModel(nn.Module):
         x = self.b6(x)
         x = self.b7(x)
         x = self.b8(x)
-        x = F.adaptive_avg_pool2d(x, 1).squeeze()
+        x = F.adaptive_avg_pool2d(x, 1).reshape(batch_size, -1)
         logit = self.logit(x)
 
         return logit, mask
