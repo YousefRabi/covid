@@ -61,7 +61,8 @@ class Runner:
         self.optimizer = self.init_optimizer()
 
         loss_builder = LossBuilder(config)
-        self.loss_func = loss_builder.get_loss()
+        self.cls_loss_func = loss_builder.get_loss()
+        self.seg_loss_func = loss_builder.BCE()
 
         scheduler_builder = SchedulerBuilder(self.optimizer,
                                              config,
@@ -267,9 +268,10 @@ class Runner:
         return val_metrics_g.to('cpu'), labels_arr, preds_arr
 
     def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g, labels_list, preds_list):
-        input_t, label_t, study_id_list = batch_tup
+        input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
+        mask_g = mask_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
 
         study_id_arr = np.array(study_id_list)
@@ -277,19 +279,24 @@ class Runner:
         preds_arr = np.empty((input_g.shape[0] * 4, 7), dtype='object')
 
         with autocast():
-            logits_g = self.model(input_g)
+            logits_g, mask_pred_g = self.model(input_g)
             probability_arr = torch.nn.functional.softmax(logits_g, dim=-1).cpu().detach().numpy()
 
-            loss_g = self.loss_func(
+            cls_loss_g = self.cls_loss_func(
                 logits_g,
                 label_g,
+            )
+
+            seg_loss_g = self.seg_loss_func(
+                mask_pred_g,
+                mask_g,
             )
 
         start_ndx = batch_ndx * batch_size
         end_ndx = start_ndx + batch_size
 
         with torch.no_grad():
-            metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = loss_g
+            metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = cls_loss_g
 
             labels_arr[:, 0] = study_id_arr
             labels_arr[:, 1] = label_g.cpu().detach().numpy()
@@ -309,7 +316,9 @@ class Runner:
         labels_list.extend(labels_arr.tolist())
         preds_list.extend(preds_arr.tolist())
 
-        return loss_g.mean()
+        mean_loss = cls_loss_g.mean() + seg_loss_g.mean()
+
+        return mean_loss
 
     def log_metrics(
         self,

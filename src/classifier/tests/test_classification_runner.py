@@ -9,6 +9,9 @@ from classifier.utils.config import load_config
 from classifier.runner.runner_factory import Runner
 
 
+pytestmark = pytest.mark.skip(reason='Skipping classification tests as this branch uses segmentation method')
+
+
 @pytest.fixture
 def runner():
     try:
