@@ -11,23 +11,38 @@ from sklearn.model_selection import StratifiedKFold
 
 def create_stratified_group_kfold_split(image_df, study_df, folds: int = 5, seed: int = 42):
     image_study_df = create_image_study_df(image_df, study_df)
+    print('image_df: ', len(image_df))
+    cleaned_image_study_df = clean_image_study_df(image_df, image_study_df)
+    print('cleaned_image_study_df: ', len(cleaned_image_study_df))
 
-    image_study_df['fold'] = -1
-    image_study_df['fold'] = stratified_group_k_fold(label='label',
-                                                     group_column='study_id',
-                                                     df=image_study_df,
-                                                     n_splits=folds,
-                                                     seed=seed)
+    cleaned_image_study_df['fold'] = -1
+    cleaned_image_study_df['fold'] = stratified_group_k_fold(label='label',
+                                                             group_column='study_id',
+                                                             df=cleaned_image_study_df,
+                                                             n_splits=folds,
+                                                             seed=seed)
 
-    print('No folds: {}'.format(len(image_study_df[image_study_df['fold'] == -1])))
+    print('No folds: {}'.format(len(cleaned_image_study_df[cleaned_image_study_df['fold'] == -1])))
 
     for fold in range(5):
         print(f'fold: {fold}')
-        print(image_study_df.label.value_counts())
+        print(cleaned_image_study_df.label.value_counts())
         print('-' * 25)
-        print(f'total: {len(image_study_df[image_study_df.fold == fold])}')
+        print(f'total: {len(cleaned_image_study_df[cleaned_image_study_df.fold == fold])}')
         print('*' * 50)
 
+    return cleaned_image_study_df
+
+
+def clean_image_study_df(image_df, image_study_df):
+    image_level_none = image_df[image_df['label'] == 'none 1 0 0 1 1']
+    study_label_dict = image_study_df[['study_id', 'label']].set_index('study_id').to_dict()['label']
+    image_level_none['study_label'] = image_level_none['StudyInstanceUID'].map(study_label_dict)
+    image_level_none = image_level_none.loc[
+        (image_level_none['label'] == 'none 1 0 0 1 1') & (image_level_none['study_label'] != 0)]
+    image_level_none['id'] = image_level_none['id'].apply(lambda x: x.replace('_image', ''))
+    bad_image_ids = image_level_none['id'].values
+    image_study_df = image_study_df[~image_study_df.image_id.isin(bad_image_ids)]
     return image_study_df
 
 
