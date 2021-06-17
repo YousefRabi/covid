@@ -47,9 +47,17 @@ def clean_image_study_df(image_df, image_study_df):
 
 
 def create_image_study_df(image_df, study_df):
-    image_study_df = pd.DataFrame(columns=['image_id', 'study_id', 'label'])
+    image_study_df = pd.DataFrame(columns=['image_id', 'study_id', 'none', 'label'])
 
-    image_study_df[['image_id', 'study_id']] = image_df[['id', 'StudyInstanceUID']]
+    image_df['none'] = 0
+    image_df.loc[image_df['label'] == 'none 1 0 0 1 1', 'none'] = 1
+
+    print('image_df none')
+    print('*' * 50)
+    print(image_df.none.value_counts())
+    print('*' * 50)
+
+    image_study_df[['image_id', 'study_id', 'none']] = image_df[['id', 'StudyInstanceUID', 'none']]
     image_study_df['image_id'] = image_study_df['image_id'].apply(lambda x: x.replace('_image', ''))
 
     for idx, row in study_df.iterrows():
