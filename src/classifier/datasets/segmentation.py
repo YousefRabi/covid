@@ -22,14 +22,16 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
                  image_df: pd.DataFrame,
                  transforms,
                  image_resolution: int,
+                 external_data_folder: str = '',
+                 external_data_df: pd.DataFrame = False,
                  overfit_single_batch: bool = False):
         self.root = Path(image_folder)
         self.mask_folder = Path(opacity_mask_folder)
         self.image_resolution = image_resolution
         self.transforms = transforms
 
-        self.image_names = image_df.image_id.values + '.jpg'
-        self.mask_names = image_df.image_id.values + '.png'
+        self.image_paths = self.root.as_posix() + '/' + image_df.image_id.values + '.jpg'
+        self.mask_paths = self.mask_folder.as_posix() + '/' + image_df.image_id.values + '.png'
         self.labels = image_df.label.values
         self.study_ids = image_df.study_id.values
 
@@ -37,8 +39,8 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
             self.image_names = self.image_names[:64]
 
     def __getitem__(self, idx: int) -> tuple:
-        image_path = self.root / self.image_names[idx]
-        mask_path = self.mask_folder / self.mask_names[idx]
+        image_path = self.image_paths[idx]
+        mask_path = self.mask_paths[idx]
         study_id = self.study_ids[idx]
 
         try:

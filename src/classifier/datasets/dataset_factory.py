@@ -22,11 +22,18 @@ def get_classification_dataset(config, transforms, folds_df):
 
 
 def get_segmentation_dataset(config, transforms, folds_df):
+    if config.data.external_data_df:
+        external_data_df = pd.read_csv(config.data.external_data_df)
+    else:
+        external_data_df = False
+
     dataset = StudySegmentationDataset(config.data.data_dir,
                                        config.data.opacity_masks_dir,
                                        folds_df,
                                        transforms,
                                        config.data.image_resolution,
+                                       config.data.external_data_dir,
+                                       external_data_df,
                                        config.train.overfit_single_batch)
 
     return dataset
