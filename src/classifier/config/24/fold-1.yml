@@ -2,7 +2,7 @@ data:
   data_dir: 'data/processed/train/lung_crops/lung'
   opacity_masks_dir: 'data/processed/train/lung_crops/opacity_masks'
   folds_df: 'data/processed/clean_image_ids_none_cls_stratified_group_kfold_split_5_42.csv'
-  num_classes: 4
+  num_classes: 1
   idx_fold: 1
   num_folds: 5
   dataset_name: 'StudySegmentationDataset'
@@ -12,7 +12,7 @@ model:
   arch: 'SegmentationModel'
   params:
     encoder_name: 'efficientnet_b3'
-    num_classes: 4
+    num_classes: 1
     pretrained: True
 
 train:
