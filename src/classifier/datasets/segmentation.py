@@ -30,7 +30,7 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
 
         self.image_names = image_df.image_id.values + '.jpg'
         self.mask_names = image_df.image_id.values + '.png'
-        self.labels = image_df.label.values
+        self.labels = image_df.none.values
         self.study_ids = image_df.study_id.values
 
         if overfit_single_batch:

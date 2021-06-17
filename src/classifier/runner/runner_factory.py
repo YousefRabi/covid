@@ -3,6 +3,7 @@ from pathlib import Path
 from easydict import EasyDict
 
 import numpy as np
+from sklearn.metrics import roc_auc_score
 
 import skimage.io
 
@@ -274,16 +275,11 @@ class Runner:
         mask_g = mask_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
 
-        study_id_arr = np.array(study_id_list)
-        labels_arr = np.empty((label_g.shape[0], 6), dtype='object')
-        preds_arr = np.empty((input_g.shape[0] * 4, 7), dtype='object')
-
         with autocast():
             logits_g, mask_pred_g = self.model(input_g)
-            probability_arr = torch.nn.functional.softmax(logits_g, dim=-1).cpu().detach().numpy()
 
             cls_loss_g = self.cls_loss_func(
-                logits_g,
+                logits_g.flatten(),
                 label_g,
             )
 
@@ -295,25 +291,12 @@ class Runner:
         start_ndx = batch_ndx * batch_size
         end_ndx = start_ndx + batch_size
 
+        preds_arr = torch.sigmoid(logits_g).detach().cpu().flatten().numpy()
+
         with torch.no_grad():
             metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = cls_loss_g
 
-            labels_arr[:, 0] = study_id_arr
-            labels_arr[:, 1] = label_g.cpu().detach().numpy()
-            labels_arr[:, 2:] = [0, 1, 0, 1]
-
-            preds_arr[:, 0] = np.concatenate((study_id_arr,) * 4)
-            preds_arr[:, 3:] = [0, 1, 0, 1]
-            preds_arr[:len(study_id_arr), 1] = 0
-            preds_arr[:len(study_id_arr), 2] = probability_arr[:, 0]
-            preds_arr[len(study_id_arr):2*len(study_id_arr), 1] = 1
-            preds_arr[len(study_id_arr):2*len(study_id_arr), 2] = probability_arr[:, 1]
-            preds_arr[2*len(study_id_arr):3*len(study_id_arr), 1] = 2
-            preds_arr[2*len(study_id_arr):3*len(study_id_arr), 2] = probability_arr[:, 2]
-            preds_arr[3*len(study_id_arr):4*len(study_id_arr), 1] = 3
-            preds_arr[3*len(study_id_arr):4*len(study_id_arr), 2] = probability_arr[:, 3]
-
-        labels_list.extend(labels_arr.tolist())
+        labels_list.extend(label_t.detach().cpu().numpy().tolist())
         preds_list.extend(preds_arr.tolist())
 
         mean_loss = cls_loss_g.mean() + seg_loss_g.mean()
@@ -333,13 +316,11 @@ class Runner:
         metrics_dict = {}
         metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
 
-        mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
-        # Multiply by 2 /3 because LB metric is mAP and study ids have 4 labels and image ids have 2 labels
-        metrics_dict['map/all'] = mean_ap * 2 / 3
+        metrics_dict['auc/all'] = roc_auc_score(labels_arr.astype(np.int32), preds_arr.astype(np.float32))
 
         log.info(
             ("E{} {:8} {loss/all:.4f} loss, "
-             + "{map/all:.4f} mAP@0.5"
+             + "{auc/all:.4f} AUC"
              ).format(
                 epoch_ndx,
                 mode_str,
@@ -356,4 +337,4 @@ class Runner:
 
         writer.flush()
 
-        return metrics_dict['map/all']
+        return metrics_dict['auc/all']
