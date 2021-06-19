@@ -69,8 +69,8 @@ def create_yolo_folds(imgs_folder: Path, labels_folder: Path):
 
 
 def main():
-    txt_labels_folder = Path('data/processed/yolo_labels_500')
-    out_folder = Path('data/processed/lung_detector_yolov5_data')
+    txt_labels_folder = Path('data/processed/one_lung_dataset_yolo_labels')
+    out_folder = Path('data/processed/one_lung_detector_yolov5_data')
     out_folder.mkdir(parents=True, exist_ok=True)
 
     copy_images_for_yolo(txt_labels_folder,
