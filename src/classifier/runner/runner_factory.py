@@ -316,7 +316,7 @@ class Runner:
         labels_list.extend(labels_arr.tolist())
         preds_list.extend(preds_arr.tolist())
 
-        mean_loss = cls_loss_g.mean() + seg_loss_g.mean()
+        mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
         return mean_loss
 
