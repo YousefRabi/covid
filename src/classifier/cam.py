@@ -145,7 +145,7 @@ def main():
     # VGG, densenet161: model.features[-1]
     # mnasnet1_0: model.layers[-1]
     # You can print the model to help chose the layer
-    target_layer = model.net.blocks[-1]  # This is for EfficientNets
+    target_layer = model.b8  # This is for EfficientNets
 
     cam = methods[args.method](model=model,
                                target_layer=target_layer,

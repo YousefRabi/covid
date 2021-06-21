@@ -96,12 +96,12 @@ class Predictor:
         return study_preds
 
     def predict(self, batch_tup):
-        input_t, label_t, study_id_list = batch_tup
+        input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
 
         with torch.no_grad():
-            logits_g = self.model(input_g)
+            logits_g, _ = self.model(input_g)
             probability_arr = torch.nn.functional.softmax(logits_g, dim=-1).cpu().detach().numpy()
 
         batch_preds_dict = dict(zip(study_id_list, probability_arr))

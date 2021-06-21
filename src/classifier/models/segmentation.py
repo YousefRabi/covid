@@ -41,7 +41,7 @@ class SegmentationModel(nn.Module):
             nn.Conv2d(128, 1, kernel_size=1, padding=0),
         )
 
-    def forward(self, x):
+    def forward(self, x, return_mask=False):
         batch_size = len(x)
 
         x = self.b0(x)
@@ -59,7 +59,10 @@ class SegmentationModel(nn.Module):
         x = F.adaptive_avg_pool2d(x, 1).reshape(batch_size, -1)
         logit = self.logit(x)
 
-        return logit, mask
+        if return_mask:
+            return logit, mask
+
+        return logit
 
 
 class MultiClsModels:
