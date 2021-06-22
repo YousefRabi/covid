@@ -17,7 +17,7 @@ def main():
 
     assert len(riccord_df.loc[riccord_df['label'] == -1]) == 0
 
-    riccord_df = riccord_df[['fname', 'label']]
+    riccord_df = riccord_df[['fname', 'label', 'study_id']]
     print('processed riccord_df length: ', len(riccord_df))
 
     print('riccord_df label value counts')
@@ -35,7 +35,8 @@ def locate_row_to_delete(a):
 
 
 def encode_labels(df):
-    df = df[['fname', 'labels']]
+    df = df[['fname', 'labels', 'StudyInstanceUID']]
+    df.rename(columns={'StudyInstanceUID': 'study_id'}, inplace=True)
     df.dropna(subset=['labels'], inplace=True)
 
     # initialize label columns
