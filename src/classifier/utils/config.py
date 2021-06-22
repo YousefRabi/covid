@@ -172,6 +172,7 @@ def _get_default_config():
     c.loss.params = edict()
     c.loss.params.clip_grad = 0
     c.loss.params.reduction = 'mean'
+    c.loss.params.seg_multiplier = 1
 
     c.optimizer = edict()
     c.optimizer.name = 'Adam'

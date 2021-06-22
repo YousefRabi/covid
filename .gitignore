@@ -7,3 +7,4 @@ src/wandb
 runs/
 build/
 trained-models/
+wandb/
