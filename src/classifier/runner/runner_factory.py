@@ -279,7 +279,7 @@ class Runner:
         preds_arr = np.empty((input_g.shape[0] * 4, 7), dtype='object')
 
         with autocast():
-            logits_g, mask_pred_g = self.model(input_g)
+            logits_g, mask_pred_g = self.model(input_g, return_mask=True)
             probability_arr = torch.nn.functional.softmax(logits_g, dim=-1).cpu().detach().numpy()
 
             cls_loss_g = self.cls_loss_func(
@@ -316,7 +316,7 @@ class Runner:
         labels_list.extend(labels_arr.tolist())
         preds_list.extend(preds_arr.tolist())
 
-        mean_loss = cls_loss_g.mean() + seg_loss_g.mean()
+        mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
         return mean_loss
 

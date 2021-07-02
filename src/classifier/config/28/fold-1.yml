@@ -1,9 +1,7 @@
 data:
-  data_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/lung'
-  opacity_masks_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/opacity_masks'
-  external_data_dir: '/home/yousef/deep-learning/kaggle/covid/data/external/MIDRC-RICORD/MIDRC-RICORD'
-  external_data_df: '/home/yousef/deep-learning/kaggle/covid/data/external/riccord_processed.csv'
-  folds_df: '/home/yousef/deep-learning/kaggle/covid/data/processed/stratified_group_kfold_split_5_42.csv'
+  data_dir: 'data/processed/train/lung_crops/lung'
+  opacity_masks_dir: 'data/processed/train/lung_crops/opacity_masks'
+  folds_df: 'data/processed/stratified_group_kfold_split_5_42.csv'
   num_classes: 4
   idx_fold: 1
   num_folds: 5
