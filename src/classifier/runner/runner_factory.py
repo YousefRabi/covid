@@ -280,7 +280,6 @@ class Runner:
         input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
-        mask_g = mask_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
 
         study_id_arr = np.array(study_id_list)
@@ -299,9 +298,19 @@ class Runner:
                 label_g,
             )
 
+            masks = []
+            masks_preds = []
+            for i, mask in enumerate(mask_t):
+                if mask is not None:
+                    masks.append(mask)
+                    masks_preds.append(mask_pred_g[i])
+
+            masks = torch.stack(masks).to(self.device)
+            masks_preds = torch.stack(masks_preds).to(self.device)
+
             seg_loss_g = self.seg_loss_func(
-                mask_pred_g,
-                mask_g,
+                masks_preds,
+                masks,
             )
 
         start_ndx = batch_ndx * batch_size
