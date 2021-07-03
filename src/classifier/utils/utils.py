@@ -1,11 +1,10 @@
 import io
+from collections import OrderedDict
 import time
 import datetime
 import random
 
 import numpy as np
-import tensorflow as tf
-
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -44,6 +43,11 @@ def plot_to_image(figure):
     buf.seek(0)
     image = plt.imread(buf)
     return image
+
+
+def port_weights_with_different_names(pretrained_state_dict, new_state_dict):
+    ported_weights = OrderedDict((k, v) for k, v in zip(new_state_dict.keys(), pretrained_state_dict.values()))
+    return ported_weights
 
 
 def img2tensor(image: np.ndarray, dtype: np.dtype = np.float32):

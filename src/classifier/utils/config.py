@@ -10,8 +10,6 @@ def _get_default_config():
     c.data = edict()
     c.data.sample_submission_path = 'data/sample_submission.csv'
     c.data.data_dir = 'data/train/processed/images/'
-    c.data.external_data_dir = ''
-    c.data.external_data_df = ''
     c.data.params = edict()
 
     c.model = edict()

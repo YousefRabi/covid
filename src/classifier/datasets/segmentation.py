@@ -20,73 +20,69 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
                  image_folder: str,
                  opacity_mask_folder: str,
                  image_df: pd.DataFrame,
-                 split: str,
                  transforms,
+                 split,
                  image_resolution: int,
-                 external_data_folder: str = '',
-                 external_data_df: pd.DataFrame = False,
                  overfit_single_batch: bool = False):
         self.root = Path(image_folder)
         self.mask_folder = Path(opacity_mask_folder)
         self.image_resolution = image_resolution
         self.transforms = transforms
 
-        self.image_paths = self.root.as_posix() + '/' + image_df.image_id.values + '.jpg'
-        self.mask_paths = self.mask_folder.as_posix() + '/' + image_df.image_id.values + '.png'
-        self.labels = image_df.label.values.tolist()
-        self.study_ids = image_df.study_id.values.tolist()
+        self.image_df = image_df
+        # self.image_df = self.image_df.loc[self.image_df.label.isin([1, 2, 3])]
+        self.image_names = self.image_df.image_id.values + '.jpg'
+        self.mask_names = self.image_df.image_id.values + '.png'
+        self.labels = self.image_df.label.values
+        self.study_ids = self.image_df.study_id.values
 
-        self.image_paths = self.image_paths.tolist()
+        self.log_study_ids = []
 
-        print('len(self.image_paths): ', len(self.image_paths))
+        for label in np.unique(self.labels):
+            log_study_ids = np.random.choice(
+                self.image_df.loc[self.image_df.label == label, 'study_id'].values, size=8 // 4, replace=False)
+            while len(np.unique(log_study_ids)) == 1:
+                log_study_ids = np.random.choice(
+                    self.image_df.loc[self.image_df.label == label, 'study_id'].values, size=8 // 4, replace=False)
+            self.log_study_ids.extend(log_study_ids)
 
-        if external_data_folder and split == 'train':
-            assert external_data_df is not False, 'You have to provide external df if specifying external_data_folder'
-            external_image_fnames = external_data_df.fname.values
-            external_image_paths = external_data_folder + '/' + external_image_fnames
-            external_labels = external_data_df.label.values
-            external_study_ids = external_data_df.study_id.values
-            self.image_paths.extend(external_image_paths.tolist())
-            self.labels.extend(external_labels.tolist())
-            self.study_ids.extend(external_study_ids.tolist())
-
-        print('len(self.image_paths): ', len(self.image_paths))
+        self.log_image_ids = self.image_df.loc[self.image_df.study_id.isin(self.log_study_ids), 'image_id'].values
 
         if overfit_single_batch:
-            self.image_paths = self.image_paths[:64]
+            self.image_names = [image_id + '.jpg' for image_id in self.log_image_ids]
+            self.mask_names = [image_id + '.png' for image_id in self.log_image_ids]
+            self.labels = self.image_df.loc[self.image_df.image_id.isin(self.log_image_ids), 'label'].values
+            self.study_ids = self.image_df.loc[self.image_df.image_id.isin(self.log_image_ids),
+                                               'study_id'].values
 
     def __getitem__(self, idx: int) -> tuple:
-        image_path = self.image_paths[idx]
+        image_path = self.root / self.image_names[idx]
+        mask_path = self.mask_folder / self.mask_names[idx]
         study_id = self.study_ids[idx]
 
         try:
             image = skimage.io.imread(image_path)
+            mask = skimage.io.imread(mask_path)
             image = np.array(resize_xray(image, self.image_resolution))
+            mask = np.array(resize_xray(mask, self.image_resolution))
         except Exception as e:
             log.error(f'Error {e} while reading image at {image_path}')
             raise
 
-        try:
-            mask_path = self.mask_paths[idx]
-            mask = skimage.io.imread(mask_path)[..., 0]
-            mask = np.array(resize_xray(mask, 32))
-            mask_found = True
-        except IndexError:
-            mask_found = False
-            mask = np.full((32, 32), 255)  # If no mask available for image
-
         if image.ndim == 2:
             image = np.stack((image,) * 3, axis=2)
+
+        if mask.ndim == 3:
+            mask = mask[..., 0]
 
         label = torch.tensor(self.labels[idx], dtype=torch.long)
 
         if self.transforms:
-            if mask_found:
-                augment = self.transforms(image=image, mask=mask)
-                image, mask = augment['image'], augment['mask']
-            else:
-                augment = self.transforms(image=image)
+            augment = self.transforms(image=image, mask=mask)
+
+            if type(augment) == dict:  # Albumentations augment
                 image = augment['image']
+                mask = augment['mask']
 
         image = img2tensor(image) / 255
         mask = img2tensor(mask) / 255
@@ -94,4 +90,41 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
         return image, mask, label, study_id
 
     def __len__(self):
-        return len(self.image_paths)
+        return len(self.image_names)
+
+    def get_by_image_id(self, image_id):
+        image_path = self.root / (image_id + '.jpg')
+        mask_path = self.mask_folder / (image_id + '.png')
+        study_id = self.image_df.loc[
+            self.image_df.image_id == image_id, 'study_id'].item()
+        label_id = self.image_df.loc[
+            self.image_df.image_id == image_id, 'label'].item()
+
+        try:
+            image = skimage.io.imread(image_path)
+            mask = skimage.io.imread(mask_path)
+            image = np.array(resize_xray(image, self.image_resolution))
+            mask = np.array(resize_xray(mask, self.image_resolution))
+        except Exception as e:
+            log.error(f'Error {e} while reading image at {image_path}')
+            raise
+
+        if image.ndim == 2:
+            image = np.stack((image,) * 3, axis=2)
+
+        if mask.ndim == 3:
+            mask = mask[..., 0]
+
+        label = torch.tensor(label_id, dtype=torch.long)
+
+        if self.transforms:
+            augment = self.transforms(image=image, mask=mask)
+
+            if type(augment) == dict:  # Albumentations augment
+                image = augment['image']
+                mask = augment['mask']
+
+        image = img2tensor(image) / 255
+        mask = img2tensor(mask) / 255
+
+        return image, mask, label, study_id

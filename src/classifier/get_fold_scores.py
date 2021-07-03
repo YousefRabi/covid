@@ -29,7 +29,7 @@ def main():
             fold = fold_model_path.parent.parent.stem
             score = torch.load(fold_model_path)['best_score']
             shutil.copy(fold_model_path, all_folds_dir / f'{fold}.pth')
-            scores[fold] = score
+            scores[fold] = score * 2/3  # because study level has 4 labels and there are 2 more labels for image level
 
     for fold, score in scores.items():
         print(f'{fold} -- {score}')

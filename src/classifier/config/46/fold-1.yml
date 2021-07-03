@@ -1,0 +1,69 @@
+data:
+  data_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/lung'
+  opacity_masks_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/opacity_masks'
+  folds_df: '/home/yousef/deep-learning/kaggle/covid/data/processed/stratified_group_kfold_split_5_42.csv'
+  num_classes: 4
+  idx_fold: 1
+  num_folds: 5
+  dataset_name: 'StudySegmentationDataset'
+  image_resolution: 512
+
+model:
+  arch: 'GAIN'
+  params:
+    efnet_encoder_name: 'efficientnet_b3'
+    num_classes: 4
+    pretrained: True
+    gradient_layer_name: 'blocks.6.1'
+    alpha: 1.0
+    omega: 7.0
+    sigma: 0.5
+
+train:
+  batch_size: 16
+  overfit_single_batch: False
+  num_epochs: 10
+  snapshots: 1
+  checkpoint_path: '/home/yousef/deep-learning/kaggle/my-gain/trained-models/46/pretrained-exp-28-weights/fold-1.pth'
+
+test:
+  batch_size: 16
+  cls_threshold: 0.5
+  tta:
+    horizontal: False
+    vertical: False
+
+transforms:
+  train:
+    HorizontalFlip: True
+    VerticalFlip: True
+    Transpose: True
+    BrightnessContrast:
+      p: 0.3
+    HueSaturationValue:
+      p: 0.2
+    Blur: True
+    Noise: True
+    ShiftScaleRotate:
+      p: 0.3
+
+loss:
+  name: "CrossEntropy"
+  params:
+    reduction: 'none'
+
+optimizer:
+  name: 'Adam'
+  params:
+    lr: 1.0e-6
+
+scheduler:
+  name: 'cosine'
+  params:
+    min_lr: 0.0
+
+num_workers: 4
+device: 'cuda:0'
+multi_gpu: False
+debug: False
+work_dir: 'build/'

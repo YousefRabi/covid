@@ -35,24 +35,25 @@ def run(args):
 
     train_transforms = get_transforms(config.transforms.train)
 
-    print('train_transforms: ', train_transforms)
     train_loader = get_dataloader(config, train_transforms, split='train')
 
     model = get_model(config)
     loss_builder = LossBuilder(config)
     cls_loss_func = loss_builder.get_loss()
-    seg_loss_func = loss_builder.BCE()
+    attn_mining_loss_func = loss_builder.attention_mining_loss()
+    ext_supervision_loss_func = loss_builder.extra_supervision_loss()
     optimizer = get_optimizer(model.parameters(), config)
     scaler = torch.cuda.amp.GradScaler()
     if config.multi_gpu:
         model = torch.nn.DataParallel(model)
     model.to(config.device)
 
-    find_lr(config, model, optimizer, cls_loss_func, seg_loss_func,
-            train_loader, scaler, final_value=args.max_lr)
+    find_lr(config, model, optimizer, cls_loss_func, attn_mining_loss_func,
+            ext_supervision_loss_func, train_loader, scaler, final_value=args.max_lr)
 
 
-def find_lr(config, model, optimizer, cls_loss_func, seg_loss_func, train_loader,
+def find_lr(config, model, optimizer, cls_loss_func, attn_mining_loss_func,
+            ext_supervision_loss_func, train_loader,
             scaler, init_value=1e-8, final_value=10., beta=0.98):
 
     num = len(train_loader) - 1
@@ -65,45 +66,30 @@ def find_lr(config, model, optimizer, cls_loss_func, seg_loss_func, train_loader
     batch_num = 0
     losses = []
     log_lrs = []
+    alpha = config.model.params.alpha
+    omega = config.model.params.omega
 
     print('Training for one epoch to find best LR...')
     for i, data in tqdm(enumerate(train_loader), total=len(train_loader)):
         batch_num += 1
         # As before, get the loss for this mini-batch of inputs/outputs
-        inputs, masks_t, labels, study_ids = data
+        inputs, masks, labels, study_ids = data
         inputs = inputs.cuda()
-        masks_g = masks_t.cuda()
+        masks = masks.cuda()
         labels = labels.cuda()
         optimizer.zero_grad()
 
         with autocast():
-            logits, mask_pred_g = model(inputs, return_mask=True)
-            cls_loss_g = cls_loss_func(
-                logits,
-                labels,
-            )
+            results = model(inputs, labels)
+            cls_loss = cls_loss_func(results['logits'], labels)
+            attn_mining_loss = attn_mining_loss_func(results['logits_am'], labels)
+            ext_loss = ext_supervision_loss_func(results['attention_maps'], masks)
 
-            masks = []
-            masks_preds = []
-            for i, mask in enumerate(masks_g):
-                if mask.sum() != 1024:  # 32x32 mask of all 1s (no mask) == 1024
-                    masks.append(mask)
-                    masks_preds.append(mask_pred_g[i])
-
-            masks = torch.stack(masks).cuda()
-            masks_preds = torch.stack(masks_preds).cuda()
-
-            seg_loss_g = seg_loss_func(
-                masks_preds,
-                masks,
-            )
-
-        loss = cls_loss_g.mean() + config.loss.params.seg_multiplier * seg_loss_g.mean()
+        loss = cls_loss.mean() + alpha * attn_mining_loss.mean() + omega * ext_loss.mean()
 
         if config.train.accumulation_steps != 1:
             loss /= accumulation_steps
 
-        loss = loss.mean()
         # Compute the smoothed loss
         avg_loss = beta * avg_loss + (1 - beta) * loss.item()
         smoothed_loss = avg_loss / (1 - beta ** batch_num)

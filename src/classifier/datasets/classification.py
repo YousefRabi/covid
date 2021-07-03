@@ -48,6 +48,7 @@ class StudyClassificationDataset(torch.utils.data.Dataset):
             image = np.stack((image,) * 3, axis=2)
 
         label = torch.tensor(self.labels[idx], dtype=torch.long)
+        label = torch.nn.functional.one_hot(label, num_classes=4)
 
         if self.transforms:
             image = self.transforms(image=image)

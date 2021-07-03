@@ -55,3 +55,23 @@ class LossBuilder:
                     (torch.dot(targets, targets) + torch.dot(logits, logits))))
             return loss
         return loss_fn
+
+    def attention_mining_loss(self):
+        def loss_fn(logits_am, labels):
+            '''Labels have to be one-hot encoded'''
+            # Eq 5
+            loss_am = torch.sigmoid(logits_am) * labels
+            loss_am = loss_am.sum(dim=1)
+            return loss_am
+        return loss_fn
+
+    def extra_supervision_loss(self):
+        def loss_fn(attention_maps, masks):
+            # Eq 7
+            min_val = attention_maps.amin(dim=[1, 2, 3], keepdim=True)
+            max_val = attention_maps.amax(dim=[1, 2, 3], keepdim=True)
+            attention_maps = (attention_maps - min_val) / (max_val - min_val + 1e-6)
+            criterion = nn.BCEWithLogitsLoss(reduction=self.config.loss.params.reduction)
+            loss_ext = criterion(attention_maps, masks)
+            return loss_ext
+        return loss_fn
