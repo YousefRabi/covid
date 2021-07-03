@@ -315,12 +315,12 @@ class Runner:
         )
 
         if mode_str == 'trn':
-            label_one_hot_g = torch.nn.functional.one_hot(label_g, num_classes=4)
+            # label_one_hot_g = torch.nn.functional.one_hot(label_g, num_classes=4)
 
-            attention_mining_loss_g = self.attn_mining_loss(
-                results[LOGITS_AM],
-                label_one_hot_g,
-            )
+            # attention_mining_loss_g = self.attn_mining_loss(
+            #     results[LOGITS_AM],
+            #     label_one_hot_g,
+            # )
 
             ext_loss_g = self.extra_supervision_loss(
                 results[ATTENTION_MAPS],
@@ -344,11 +344,11 @@ class Runner:
         total_loss = cls_loss_g
 
         if mode_str == 'trn':
-            total_loss += self.config.model.params.alpha * attention_mining_loss_g +\
-                self.config.model.params.omega * ext_loss_g
+            total_loss += self.config.model.params.omega * ext_loss_g   # +\
+            # self.config.model.params.alpha * attention_mining_loss_g
 
         if mode_str == 'trn':
-            metrics_t[METRICS_ATTN_MINING_LOSS_NDX, start_ndx:end_ndx] = attention_mining_loss_g.detach().cpu()
+            # metrics_t[METRICS_ATTN_MINING_LOSS_NDX, start_ndx:end_ndx] = attention_mining_loss_g.detach().cpu()
             metrics_t[METRICS_EXT_SUPERVISION_LOSS_NDX, start_ndx:end_ndx] = ext_loss_g.detach().cpu()
 
         metrics_t[METRICS_TOTAL_LOSS_NDX, start_ndx:end_ndx] = total_loss.cpu()
@@ -378,8 +378,6 @@ class Runner:
                 dataformats='HWC',
             )
 
-            skimage.io.imsave(self.config.work_dir / f'{mode_str}-{study_id}-label.png', heatmap_image_label)
-
         heatmap_image_pred = self._combine_heatmap_with_image(
             image, attention_map, prediction)
 
@@ -389,8 +387,6 @@ class Runner:
             self.total_training_samples_count,
             dataformats='HWC',
         )
-
-        skimage.io.imsave(self.config.work_dir / f'{mode_str}-{study_id}-pred.png', heatmap_image_pred)
 
         writer.flush()
 
@@ -446,7 +442,7 @@ class Runner:
 
         if mode_str == 'trn':
             metrics_dict['loss/cls'] = metrics_t[METRICS_CLS_LOSS_NDX].mean()
-            metrics_dict['loss/attn'] = metrics_t[METRICS_ATTN_MINING_LOSS_NDX].mean()
+            # metrics_dict['loss/attn'] = metrics_t[METRICS_ATTN_MINING_LOSS_NDX].mean()
             metrics_dict['loss/ext'] = metrics_t[METRICS_EXT_SUPERVISION_LOSS_NDX].mean()
 
         metrics_dict['loss/all'] = metrics_t[METRICS_TOTAL_LOSS_NDX].mean()
@@ -481,7 +477,7 @@ class Runner:
         if mode_str == 'trn':
             log.info(
                 ("E{} {:8} {loss/cls:.4f} cls_loss, "
-                 + "{loss/attn:.4f} attn_loss "
+                 # + "{loss/attn:.4f} attn_loss "
                  + "{loss/ext:.4f} ext_loss"
                  ).format(
                     epoch_ndx,
