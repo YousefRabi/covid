@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from easydict import EasyDict
+from collections import defaultdict
 
 import numpy as np
 
@@ -56,7 +57,7 @@ class Runner:
         self.device = torch.device('cuda')
 
         self.trn_transforms = get_first_place_melanoma_transforms(config.data.image_resolution)
-        log.info('train transforms: ', self.trn_transforms)
+        log.info(f'train transforms: {self.trn_transforms}')
         self.val_transforms = get_transforms(config.transforms.test)
 
         self.train_dl = self.init_train_dl()
@@ -199,13 +200,14 @@ class Runner:
 
     def do_training(self, epoch_ndx):
         self.model.train()
-        trn_metrics_g = torch.zeros(
+        trn_metrics_t = torch.zeros(
             METRICS_SIZE,
             len(self.train_dl.dataset),
-            device=self.device
+            device=torch.device('cpu'),
         )
-        labels_list = []
-        preds_list = []
+
+        labels_dict = defaultdict()
+        preds_dict = defaultdict(list)
         confusion_matrix_dict = {'labels': [], 'preds': []}
 
         batch_iter = enumerate_with_estimate(
@@ -221,9 +223,10 @@ class Runner:
                 batch_ndx,
                 batch_tup,
                 self.train_dl.batch_size,
-                trn_metrics_g,
-                labels_list,
-                preds_list,
+                trn_metrics_t,
+                labels_dict,
+                preds_dict,
+                'trn',
                 confusion_matrix_dict
             )
 
@@ -236,22 +239,19 @@ class Runner:
 
         self.total_training_samples_count += len(self.train_dl.dataset)
 
-        labels_arr = np.array(labels_list, dtype='object')
-        preds_arr = np.array(preds_list, dtype='object')
-
-        return trn_metrics_g.to('cpu'), labels_arr, preds_arr, confusion_matrix_dict
+        return trn_metrics_t.to('cpu'), labels_dict, preds_dict, confusion_matrix_dict
 
     def do_validation(self, epoch_ndx):
         with torch.no_grad():
             self.model.eval()
-            val_metrics_g = torch.zeros(
+            val_metrics_t = torch.zeros(
                 METRICS_SIZE,
                 len(self.val_dl.dataset),
-                device=self.device,
+                device=torch.device('cpu'),
             )
 
-            labels_list = []
-            preds_list = []
+            labels_dict = dict()
+            preds_dict = defaultdict(list)
             confusion_matrix_dict = {'labels': [], 'preds': []}
 
             batch_iter = enumerate_with_estimate(
@@ -265,27 +265,23 @@ class Runner:
                     batch_ndx,
                     batch_tup,
                     self.val_dl.batch_size,
-                    val_metrics_g,
-                    labels_list,
-                    preds_list,
+                    val_metrics_t,
+                    labels_dict,
+                    preds_dict,
+                    'val',
                     confusion_matrix_dict
                 )
 
-            labels_arr = np.array(labels_list)
-            preds_arr = np.array(preds_list)
+        return val_metrics_t, labels_dict, preds_dict, confusion_matrix_dict
 
-        return val_metrics_g.to('cpu'), labels_arr, preds_arr, confusion_matrix_dict
-
-    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g,
-                           labels_list, preds_list, confusion_matrix_dict):
+    def compute_batch_loss(self, epoch_ndx, batch_ndx, batch_tup, batch_size,
+                           metrics_t, labels_dict, preds_dict, confusion_matrix_dict):
         input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
 
         study_id_arr = np.array(study_id_list)
-        labels_arr = np.empty((label_g.shape[0], 6), dtype='object')
-        preds_arr = np.empty((input_g.shape[0] * 4, 7), dtype='object')
 
         with autocast():
             logits_g, mask_pred_g = self.model(input_g, return_mask=True)
@@ -317,26 +313,11 @@ class Runner:
         start_ndx = batch_ndx * batch_size
         end_ndx = start_ndx + batch_size
 
-        with torch.no_grad():
-            metrics_g[METRICS_LOSS_NDX, start_ndx:end_ndx] = cls_loss_g
+        for i, study_id in enumerate(study_id_arr):
+            preds_dict[study_id].append(probability_arr[i])
+            labels_dict[study_id] = label_g.cpu().detach().numpy()[i]
 
-            labels_arr[:, 0] = study_id_arr
-            labels_arr[:, 1] = label_g.cpu().detach().numpy()
-            labels_arr[:, 2:] = [0, 1, 0, 1]
-
-            preds_arr[:, 0] = np.concatenate((study_id_arr,) * 4)
-            preds_arr[:, 3:] = [0, 1, 0, 1]
-            preds_arr[:len(study_id_arr), 1] = 0
-            preds_arr[:len(study_id_arr), 2] = probability_arr[:, 0]
-            preds_arr[len(study_id_arr):2*len(study_id_arr), 1] = 1
-            preds_arr[len(study_id_arr):2*len(study_id_arr), 2] = probability_arr[:, 1]
-            preds_arr[2*len(study_id_arr):3*len(study_id_arr), 1] = 2
-            preds_arr[2*len(study_id_arr):3*len(study_id_arr), 2] = probability_arr[:, 2]
-            preds_arr[3*len(study_id_arr):4*len(study_id_arr), 1] = 3
-            preds_arr[3*len(study_id_arr):4*len(study_id_arr), 2] = probability_arr[:, 3]
-
-        labels_list.extend(labels_arr.tolist())
-        preds_list.extend(preds_arr.tolist())
+        metrics_t[METRICS_LOSS_NDX, start_ndx:end_ndx] = cls_loss_g
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
@@ -347,8 +328,8 @@ class Runner:
         epoch_ndx,
         mode_str,
         metrics_t,
-        labels_arr,
-        preds_arr,
+        labels_dict,
+        preds_dict,
         confusion_matrix_dict,
     ):
         # assert torch.isfinite(metrics_t).all()
@@ -356,13 +337,38 @@ class Runner:
         metrics_dict = {}
         metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
 
+        labels_arr = np.array([[key, value, 0, 1, 0, 1] for key, value in labels_dict.items()])
+
+        preds_arr = []
+        for key, value in preds_dict.items():
+            mean_preds = np.mean(value, axis=0)
+            for i, cls_pred in enumerate(mean_preds):
+                preds_arr.append([key, i, cls_pred, 0, 1, 0, 1])
+        preds_arr = np.array(preds_arr)
+
         mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
         # Multiply by 2 /3 because LB metric is mAP and study ids have 4 labels and image ids have 2 labels
-        metrics_dict['map/all'] = mean_ap * 2 / 3
+        metrics_dict['map/negative'] = average_precisions['0'][0]
+        metrics_dict['map/typical'] = average_precisions['1'][0]
+        metrics_dict['map/indeterminate'] = average_precisions['2'][0]
+        metrics_dict['map/atypical'] = average_precisions['3'][0]
+        metrics_dict['map/all'] = mean_ap
 
         log.info(
             ("E{} {:8} {loss/all:.4f} loss, "
              + "{map/all:.4f} mAP@0.5"
+             ).format(
+                epoch_ndx,
+                mode_str,
+                **metrics_dict,
+            )
+        )
+
+        log.info(
+            ("E{} {:8} {map/negative:.4f} mAP/negative, "
+             + "{map/typical:.4f} mAP/typical "
+             + "{map/indeterminate:.4f} mAP/indeterminate "
+             + "{map/atypical:.4f} mAP/atypical "
              ).format(
                 epoch_ndx,
                 mode_str,
