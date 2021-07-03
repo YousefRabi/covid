@@ -20,6 +20,7 @@ train:
   overfit_single_batch: False
   num_epochs: 30
   snapshots: 1
+  checkpoint_path: '/home/yousef/deep-learning/kaggle/covid/trained-models/47/2021-07-04_06.42.53/fold-0/checkpoints/best_model.pth'
 
 test:
   batch_size: 32
@@ -39,10 +40,10 @@ loss:
 optimizer:
   name: 'Adam'
   params:
-    lr: 0.001
+    lr: 1.0e-4
 
 scheduler:
-  name: 'onecycle'
+  name: ''
   params:
     max_lr: 1.0e-2
     div_factor: 10
