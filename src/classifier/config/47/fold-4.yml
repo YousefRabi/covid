@@ -18,7 +18,7 @@ model:
 train:
   batch_size: 32
   overfit_single_batch: False
-  num_epochs: 15
+  num_epochs: 30
   snapshots: 1
 
 test:
@@ -44,9 +44,9 @@ optimizer:
 scheduler:
   name: 'onecycle'
   params:
-    max_lr: 0.001
+    max_lr: 1.0e-2
     div_factor: 10
-    pct_start: 0.3
+    pct_start: 0.0
     final_div_factor: 100
 
 num_workers: 8
