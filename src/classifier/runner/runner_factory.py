@@ -56,6 +56,7 @@ class Runner:
         self.device = torch.device('cuda')
 
         self.trn_transforms = get_first_place_melanoma_transforms(config.data.image_resolution)
+        log.info('train transforms: ', self.trn_transforms)
         self.val_transforms = get_transforms(config.transforms.test)
 
         self.train_dl = self.init_train_dl()
