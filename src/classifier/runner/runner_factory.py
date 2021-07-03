@@ -226,7 +226,6 @@ class Runner:
                 trn_metrics_t,
                 labels_dict,
                 preds_dict,
-                'trn',
                 confusion_matrix_dict
             )
 
@@ -268,13 +267,12 @@ class Runner:
                     val_metrics_t,
                     labels_dict,
                     preds_dict,
-                    'val',
                     confusion_matrix_dict
                 )
 
         return val_metrics_t, labels_dict, preds_dict, confusion_matrix_dict
 
-    def compute_batch_loss(self, epoch_ndx, batch_ndx, batch_tup, batch_size,
+    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size,
                            metrics_t, labels_dict, preds_dict, confusion_matrix_dict):
         input_t, mask_t, label_t, study_id_list = batch_tup
 
