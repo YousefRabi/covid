@@ -42,10 +42,7 @@ def plot_to_image(figure):
     # the notebook.
     plt.close(figure)
     buf.seek(0)
-    # Convert PNG buffer to TF image
-    image = tf.image.decode_png(buf.getvalue(), channels=4)
-    # Add the batch dimension
-    image = tf.expand_dims(image, 0)
+    image = plt.imread(buf)
     return image
 
 
