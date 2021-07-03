@@ -18,7 +18,7 @@ from map_boxes import mean_average_precision_for_boxes
 from classifier.models import get_model
 from classifier.optimizers import get_optimizer
 from classifier.datasets import get_dataloader
-from classifier.transforms import get_transforms
+from classifier.transforms import get_transforms, get_first_place_melanoma_transforms
 from classifier.losses import LossBuilder
 from classifier.schedulers import SchedulerBuilder
 from classifier.utils.utils import (fix_seed, enumerate_with_estimate,
@@ -55,7 +55,7 @@ class Runner:
 
         self.device = torch.device('cuda')
 
-        self.trn_transforms = get_transforms(config.transforms.train)
+        self.trn_transforms = get_first_place_melanoma_transforms(config.data.image_resolution)
         self.val_transforms = get_transforms(config.transforms.test)
 
         self.train_dl = self.init_train_dl()
