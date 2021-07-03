@@ -5,7 +5,7 @@ from easydict import EasyDict
 import numpy as np
 
 import skimage.io
-import sklearn
+from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -160,15 +160,15 @@ class Runner:
             ))
 
             log.info(f'LR - {self.optimizer.param_groups[0]["lr"]}')
-            trn_metrics_t, labels_arr, preds_arr = self.do_training(epoch_ndx)
-            self.log_metrics(epoch_ndx, 'trn', trn_metrics_t, labels_arr, preds_arr)
+            trn_metrics_t, labels_arr, preds_arr, confusion_matrix_dict = self.do_training(epoch_ndx)
+            self.log_metrics(epoch_ndx, 'trn', trn_metrics_t, labels_arr, preds_arr, confusion_matrix_dict)
 
             if not self.config.train.overfit_single_batch:
-                val_metrics_t, labels_arr, preds_arr = self.do_validation(epoch_ndx)
-                score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr)
+                val_metrics_t, labels_arr, preds_arr, confusion_matrix_dict = self.do_validation(epoch_ndx)
+                score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr, confusion_matrix_dict)
 
                 if score > self.best_score:
-                    log.info(f'Loss improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
+                    log.info(f'mAP improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
                     save_model_with_optimizer(self.model,
                                               self.optimizer,
                                               self.scheduler,
@@ -184,7 +184,7 @@ class Runner:
                                   self.config.multi_gpu,
                                   self.config.work_dir / 'checkpoints' / 'latest_model.pth')
 
-        log.info(f'Best score: {self.best_score}')
+        log.info(f'Best mAP: {self.best_score}')
         self.trn_writer.close()
         self.val_writer.close()
 
@@ -238,7 +238,7 @@ class Runner:
         labels_arr = np.array(labels_list, dtype='object')
         preds_arr = np.array(preds_list, dtype='object')
 
-        return trn_metrics_g.to('cpu'), labels_arr, preds_arr
+        return trn_metrics_g.to('cpu'), labels_arr, preds_arr, confusion_matrix_dict
 
     def do_validation(self, epoch_ndx):
         with torch.no_grad():
@@ -273,7 +273,7 @@ class Runner:
             labels_arr = np.array(labels_list)
             preds_arr = np.array(preds_list)
 
-        return val_metrics_g.to('cpu'), labels_arr, preds_arr
+        return val_metrics_g.to('cpu'), labels_arr, preds_arr, confusion_matrix_dict
 
     def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g,
                            labels_list, preds_list, confusion_matrix_dict):
@@ -301,7 +301,7 @@ class Runner:
             masks = []
             masks_preds = []
             for i, mask in enumerate(mask_t):
-                if mask is not None:
+                if mask.sum() != 1024:  # 32x32 mask of all 1s (no mask) == 1024
                     masks.append(mask)
                     masks_preds.append(mask_pred_g[i])
 
@@ -376,9 +376,8 @@ class Runner:
         for key, value in metrics_dict.items():
             writer.add_scalar(prefix_str + key, value, self.total_training_samples_count)
 
-        confusion_matrix = sklearn.metrics.confusion_matrix(confusion_matrix_dict['labels'],
-                                                            confusion_matrix_dict['preds'])
-        confusion_matrix_image = confusion_matrix_to_image(confusion_matrix)
+        cm = confusion_matrix(confusion_matrix_dict['labels'], confusion_matrix_dict['preds'])
+        confusion_matrix_image = confusion_matrix_to_image(cm)
 
         writer.add_image(
             f'{mode_str}-confusion-matrix',

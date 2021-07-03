@@ -1,7 +1,6 @@
 set -eux pipefail
 
-export CUDA_VISIBLE_DEVICES=1
-export PYTHONPATH='/home/yousef/deep-learning/kaggle/covid/src/'
+export CUDA_VISIBLE_DEVICES=0
 
 python src/classifier/train.py --config src/classifier/config/23/fold-0.yml
 python src/classifier/train.py --config src/classifier/config/23/fold-1.yml

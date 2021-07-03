@@ -11,7 +11,7 @@ from classifier.utils.logconf import logging
 log = logging.getLogger(__name__)
 
 
-def get_classification_dataset(config, transforms, folds_df):
+def get_classification_dataset(config, split, transforms, folds_df):
     dataset = StudyClassificationDataset(config.data.data_dir,
                                          folds_df,
                                          transforms,
@@ -21,7 +21,7 @@ def get_classification_dataset(config, transforms, folds_df):
     return dataset
 
 
-def get_segmentation_dataset(config, transforms, folds_df):
+def get_segmentation_dataset(config, split, transforms, folds_df):
     if config.data.external_data_df:
         external_data_df = pd.read_csv(config.data.external_data_df)
     else:
@@ -30,6 +30,7 @@ def get_segmentation_dataset(config, transforms, folds_df):
     dataset = StudySegmentationDataset(config.data.data_dir,
                                        config.data.opacity_masks_dir,
                                        folds_df,
+                                       split,
                                        transforms,
                                        config.data.image_resolution,
                                        config.data.external_data_dir,
@@ -55,6 +56,7 @@ def get_dataloader(config, transforms, split):
         raise NotImplementedError(f'Split {split} is not implemented. Choose train or valid.')
 
     dataset = DATASET_FUNC_DICT[config.data.dataset_name](config,
+                                                          split,
                                                           transforms,
                                                           folds_df)
 
