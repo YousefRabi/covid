@@ -5,6 +5,9 @@ from easydict import EasyDict
 import numpy as np
 
 import skimage.io
+import sklearn
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 import torch
 from torch.cuda.amp import autocast
@@ -18,7 +21,8 @@ from classifier.datasets import get_dataloader
 from classifier.transforms import get_transforms
 from classifier.losses import LossBuilder
 from classifier.schedulers import SchedulerBuilder
-from classifier.utils.utils import fix_seed, enumerate_with_estimate, save_model_with_optimizer
+from classifier.utils.utils import (fix_seed, enumerate_with_estimate,
+                                    save_model_with_optimizer, confusion_matrix_to_image)
 from classifier.utils.logconf import logging, formatter
 
 
@@ -201,6 +205,7 @@ class Runner:
         )
         labels_list = []
         preds_list = []
+        confusion_matrix_dict = {'labels': [], 'preds': []}
 
         batch_iter = enumerate_with_estimate(
             self.train_dl,
@@ -217,7 +222,8 @@ class Runner:
                 self.train_dl.batch_size,
                 trn_metrics_g,
                 labels_list,
-                preds_list
+                preds_list,
+                confusion_matrix_dict
             )
 
             self.scaler.scale(loss_var).backward()
@@ -245,6 +251,7 @@ class Runner:
 
             labels_list = []
             preds_list = []
+            confusion_matrix_dict = {'labels': [], 'preds': []}
 
             batch_iter = enumerate_with_estimate(
                 self.val_dl,
@@ -259,7 +266,8 @@ class Runner:
                     self.val_dl.batch_size,
                     val_metrics_g,
                     labels_list,
-                    preds_list
+                    preds_list,
+                    confusion_matrix_dict
                 )
 
             labels_arr = np.array(labels_list)
@@ -267,7 +275,8 @@ class Runner:
 
         return val_metrics_g.to('cpu'), labels_arr, preds_arr
 
-    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g, labels_list, preds_list):
+    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size, metrics_g,
+                           labels_list, preds_list, confusion_matrix_dict):
         input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
@@ -281,6 +290,9 @@ class Runner:
         with autocast():
             logits_g, mask_pred_g = self.model(input_g, return_mask=True)
             probability_arr = torch.nn.functional.softmax(logits_g, dim=-1).cpu().detach().numpy()
+            preds = torch.argmax(logits_g, dim=-1).cpu().detach().numpy().ravel().tolist()
+            confusion_matrix_dict['preds'].extend(preds)
+            confusion_matrix_dict['labels'].extend(label_g.cpu().detach().numpy().ravel().tolist())
 
             cls_loss_g = self.cls_loss_func(
                 logits_g,
@@ -327,6 +339,7 @@ class Runner:
         metrics_t,
         labels_arr,
         preds_arr,
+        confusion_matrix_dict,
     ):
         # assert torch.isfinite(metrics_t).all()
 
@@ -353,6 +366,17 @@ class Runner:
 
         for key, value in metrics_dict.items():
             writer.add_scalar(prefix_str + key, value, self.total_training_samples_count)
+
+        confusion_matrix = sklearn.metrics.confusion_matrix(confusion_matrix_dict['labels'],
+                                                            confusion_matrix_dict['preds'])
+        confusion_matrix_image = confusion_matrix_to_image(confusion_matrix)
+
+        writer.add_image(
+            f'{mode_str}-confusion-matrix',
+            confusion_matrix_image,
+            self.total_training_samples_count,
+            dataformats='HWC',
+        )
 
         writer.flush()
 
