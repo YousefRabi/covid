@@ -20,6 +20,7 @@ train:
   overfit_single_batch: False
   num_epochs: 30
   snapshots: 1
+
 test:
   batch_size: 32
   cls_threshold: 0.5
@@ -38,15 +39,15 @@ loss:
 optimizer:
   name: 'Adam'
   params:
-    lr: 0.001
+    lr: 1.0e-2
 
 scheduler:
-  name: ''
+  name: 'onecycle'
   params:
     max_lr: 1.0e-2
-    div_factor: 10
-    pct_start: 0.0
-    final_div_factor: 100
+    div_factor: 20
+    pct_start: 0.2
+    final_div_factor: 50
 
 num_workers: 8
 device: 'cuda:0'

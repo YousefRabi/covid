@@ -42,7 +42,7 @@ optimizer:
     lr: 1.0e-2
 
 scheduler:
-  name: ''
+  name: 'onecycle'
   params:
     max_lr: 1.0e-2
     div_factor: 20
