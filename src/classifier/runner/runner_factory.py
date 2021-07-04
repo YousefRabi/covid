@@ -515,6 +515,14 @@ class Runner:
             dataformats='HWC',
         )
 
+        if metrics_dict['map/all'] > self.best_score:
+            writer.add_image(
+                f'{mode_str}-best-confusion-matrix',
+                confusion_matrix_image,
+                self.total_training_samples_count,
+                dataformats='HWC',
+            )
+
         writer.flush()
 
         return metrics_dict['map/all']
