@@ -337,7 +337,7 @@ class Runner:
                 masks,
             )
 
-            ext_loss_g = ext_loss_g.mean(dim=[1, 2, 3])
+            ext_loss_g = ext_loss_g.mean()
 
         start_ndx = batch_ndx * batch_size
         end_ndx = start_ndx + batch_size
@@ -351,7 +351,7 @@ class Runner:
 
         metrics_t[METRICS_CLS_LOSS_NDX, start_ndx:end_ndx] = cls_loss_g.detach().cpu()
 
-        total_loss = cls_loss_g
+        total_loss = cls_loss_g.mean()
 
         if mode_str == 'trn':
             total_loss += self.config.model.params.omega * ext_loss_g   # +\
@@ -364,7 +364,7 @@ class Runner:
         metrics_t[METRICS_TOTAL_LOSS_NDX, start_ndx:end_ndx] = total_loss.cpu()
 
         if mode_str == 'trn':
-            self.scaler.scale(total_loss.mean()).backward()
+            self.scaler.scale(total_loss).backward()
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
