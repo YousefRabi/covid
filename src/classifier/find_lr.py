@@ -80,9 +80,10 @@ def find_lr(config, model, optimizer, cls_loss_func, attn_mining_loss_func,
         optimizer.zero_grad()
 
         with autocast():
-            results = model(inputs, labels)
+            results = model(inputs, labels, mode_str='trn')
             cls_loss = cls_loss_func(results['logits'], labels)
-            attn_mining_loss = attn_mining_loss_func(results['logits_am'], labels)
+            label_one_hot_g = torch.nn.functional.one_hot(labels, num_classes=4)
+            attn_mining_loss = attn_mining_loss_func(results['logits_am'], label_one_hot_g)
             ext_loss = ext_supervision_loss_func(results['attention_maps'], masks)
 
         loss = cls_loss.mean() + alpha * attn_mining_loss.mean() + omega * ext_loss.mean()
