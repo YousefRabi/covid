@@ -53,12 +53,12 @@ loss:
 optimizer:
   name: 'Adam'
   params:
-    lr: 0.001
+    lr: 1.0e-4
 
 scheduler:
   name: 'onecycle'
   params:
-    max_lr: 0.001
+    max_lr: 1.0e-4
     div_factor: 10
     pct_start: 0.3
     final_div_factor: 100
