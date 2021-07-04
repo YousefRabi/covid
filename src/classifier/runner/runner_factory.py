@@ -322,9 +322,19 @@ class Runner:
             #     label_one_hot_g,
             # )
 
+            masks = []
+            attention_maps = []
+            for i, mask in enumerate(mask_t):
+                if mask.sum() != 0:
+                    masks.append(mask)
+                    attention_maps.append(results[ATTENTION_MAPS][i])
+
+            masks = torch.stack(masks).to(self.device)
+            attention_maps = torch.stack(attention_maps).to(self.device)
+
             ext_loss_g = self.extra_supervision_loss(
-                results[ATTENTION_MAPS],
-                mask_g,
+                attention_maps,
+                masks,
             )
 
             ext_loss_g = ext_loss_g.mean(dim=[1, 2, 3])
