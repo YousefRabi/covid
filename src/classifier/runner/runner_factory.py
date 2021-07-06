@@ -281,7 +281,7 @@ class Runner:
         return val_metrics_t, labels_dict, preds_dict, confusion_matrix_dict
 
     def compute_batch_loss(self, epoch_ndx, batch_ndx, batch_tup, batch_size,
-                           metrics_t, labels_dict, preds_dict, mode_str, confusion_matrix_dict):
+                           metrics_t, labels_dict, preds_dict, confusion_matrix_dict, mode_str):
         input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
