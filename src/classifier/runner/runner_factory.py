@@ -6,6 +6,7 @@ from collections import defaultdict
 import numpy as np
 
 import skimage.io
+import cv2
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -36,6 +37,9 @@ METRICS_TN_NDX = 2
 METRICS_FN_NDX = 3
 METRICS_FP_NDX = 4
 METRICS_SIZE = 5
+
+
+id2label = {0: 'negative', 1: 'typical', 2: 'indeterminate', 3: 'atypical'}
 
 
 class Runner:
@@ -220,13 +224,15 @@ class Runner:
             self.optimizer.zero_grad()
 
             loss_var = self.compute_batch_loss(
+                epoch_ndx,
                 batch_ndx,
                 batch_tup,
                 self.train_dl.batch_size,
                 trn_metrics_t,
                 labels_dict,
                 preds_dict,
-                confusion_matrix_dict
+                confusion_matrix_dict,
+                'trn'
             )
 
             self.scaler.scale(loss_var).backward()
@@ -261,19 +267,21 @@ class Runner:
 
             for batch_ndx, batch_tup in batch_iter:
                 self.compute_batch_loss(
+                    epoch_ndx,
                     batch_ndx,
                     batch_tup,
                     self.val_dl.batch_size,
                     val_metrics_t,
                     labels_dict,
                     preds_dict,
-                    confusion_matrix_dict
+                    confusion_matrix_dict,
+                    'val',
                 )
 
         return val_metrics_t, labels_dict, preds_dict, confusion_matrix_dict
 
-    def compute_batch_loss(self, batch_ndx, batch_tup, batch_size,
-                           metrics_t, labels_dict, preds_dict, confusion_matrix_dict):
+    def compute_batch_loss(self, epoch_ndx, batch_ndx, batch_tup, batch_size,
+                           metrics_t, labels_dict, preds_dict, mode_str, confusion_matrix_dict):
         input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
@@ -295,11 +303,6 @@ class Runner:
 
             masks = []
             masks_preds = []
-            for i, mask in enumerate(mask_t):
-                if mask.sum() != 1024:  # 32x32 mask of all 1s (no mask) == 1024
-                    masks.append(mask)
-                    masks_preds.append(mask_pred_g[i])
-
             masks = torch.stack(masks).to(self.device)
             masks_preds = torch.stack(masks_preds).to(self.device)
 
@@ -314,12 +317,84 @@ class Runner:
         for i, study_id in enumerate(study_id_arr):
             preds_dict[study_id].append(probability_arr[i])
             labels_dict[study_id] = label_g.cpu().detach().numpy()[i]
+            if study_id in self.train_dl.dataset.log_study_ids:
+                self.log_image(epoch_ndx, input_g[i], masks[i], label_g[i], study_id,
+                               masks_preds[i], logits_g[i], mode_str)
 
         metrics_t[METRICS_LOSS_NDX, start_ndx:end_ndx] = cls_loss_g
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
         return mean_loss
+
+    def log_image(self, epoch_ndx, image, mask, label, study_id,
+                  attention_map, logits, mode_str):
+        prediction = torch.argmax(logits)
+
+        writer = getattr(self, mode_str + '_writer')
+
+        label = id2label[label.detach().cpu().item()]
+        prediction = id2label[prediction.item()]
+
+        if epoch_ndx == 1:
+            heatmap_image_label = self._combine_heatmap_with_image(
+                image, mask, label)
+
+            writer.add_image(
+                f'{mode_str}/{study_id}_label',
+                heatmap_image_label,
+                self.total_training_samples_count,
+                dataformats='HWC',
+            )
+
+        heatmap_image_pred = self._combine_heatmap_with_image(
+            image, attention_map, prediction)
+
+        writer.add_image(
+            f'{mode_str}/{study_id}_pred',
+            heatmap_image_pred,
+            self.total_training_samples_count,
+            dataformats='HWC',
+        )
+
+        writer.flush()
+
+    def _combine_heatmap_with_image(self,
+                                    image,
+                                    heatmap,
+                                    label_name,
+                                    font_scale=1.5,
+                                    font_name=cv2.FONT_HERSHEY_SIMPLEX,
+                                    font_color=(255, 255, 255),
+                                    font_pixel_width=1):
+        # get the min and max values once to be used with scaling
+        min_val = heatmap.min()
+        max_val = heatmap.max()
+
+        # Scale the heatmap in range 0-255
+        heatmap = 255 - (255 * (heatmap - min_val)) / (max_val - min_val + 1e-10)
+        heatmap = heatmap.data.cpu().numpy().astype(np.uint8).transpose((1, 2, 0))
+        heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+
+        # Scale the image as well
+        scaled_image = image * 255.0
+        scaled_image = scaled_image.cpu().numpy().astype(np.uint8).transpose((1, 2, 0))
+
+        if scaled_image.shape[2] == 1:
+            scaled_image = cv2.cvtColor(scaled_image, cv2.COLOR_GRAY2RGB)
+
+        # generate the heatmap
+        heatmap_image = cv2.addWeighted(scaled_image, 0.7, heatmap, 0.3, 0)
+
+        # superimpose label_name
+        (_, text_size_h), baseline = cv2.getTextSize(label_name, font_name, font_scale, font_pixel_width)
+        heatmap_image = cv2.putText(heatmap_image, label_name,
+                                    (10, text_size_h + baseline + 20),
+                                    font_name,
+                                    font_scale,
+                                    font_color,
+                                    thickness=font_pixel_width)
+        return heatmap_image
 
     def log_metrics(
         self,

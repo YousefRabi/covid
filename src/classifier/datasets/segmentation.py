@@ -30,6 +30,7 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
         self.mask_folder = Path(opacity_mask_folder)
         self.image_resolution = image_resolution
         self.transforms = transforms
+        self.image_df = image_df
 
         self.image_paths = self.root.as_posix() + '/' + image_df.image_id.values + '.jpg'
         self.mask_paths = self.mask_folder.as_posix() + '/' + image_df.image_id.values + '.png'
@@ -52,8 +53,24 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
 
         print('len(self.image_paths): ', len(self.image_paths))
 
+        self.log_study_ids = []
+
+        for label in np.unique(self.labels):
+            log_study_ids = np.random.choice(
+                self.image_df.loc[self.image_df.label == label, 'study_id'].values, size=8 // 4, replace=False)
+            while len(np.unique(log_study_ids)) == 1:
+                log_study_ids = np.random.choice(
+                    self.image_df.loc[self.image_df.label == label, 'study_id'].values, size=8 // 4, replace=False)
+            self.log_study_ids.extend(log_study_ids)
+
+        self.log_image_ids = self.image_df.loc[self.image_df.study_id.isin(self.log_study_ids), 'image_id'].values
+
         if overfit_single_batch:
-            self.image_paths = self.image_paths[:64]
+            self.image_names = [image_id + '.jpg' for image_id in self.log_image_ids]
+            self.mask_names = [image_id + '.png' for image_id in self.log_image_ids]
+            self.labels = self.image_df.loc[self.image_df.image_id.isin(self.log_image_ids), 'label'].values
+            self.study_ids = self.image_df.loc[self.image_df.image_id.isin(self.log_image_ids),
+                                               'study_id'].values
 
     def __getitem__(self, idx: int) -> tuple:
         image_path = self.image_paths[idx]
@@ -71,9 +88,8 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
             mask = skimage.io.imread(mask_path)[..., 0]
             mask = np.array(resize_xray(mask, self.image_resolution))
             mask_found = True
-        except IndexError:
-            mask_found = False
-            mask = np.full((32, 32), 255)  # If no mask available for image
+        except Exception as e:
+            log.error(f'Error {e} while reading mask at {mask_path}')
 
         if image.ndim == 2:
             image = np.stack((image,) * 3, axis=2)
