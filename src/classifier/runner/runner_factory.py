@@ -285,6 +285,7 @@ class Runner:
         input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
+        mask_g = mask_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
 
         study_id_arr = np.array(study_id_list)
@@ -301,14 +302,9 @@ class Runner:
                 label_g,
             )
 
-            masks = []
-            masks_preds = []
-            masks = torch.stack(masks).to(self.device)
-            masks_preds = torch.stack(masks_preds).to(self.device)
-
             seg_loss_g = self.seg_loss_func(
-                masks_preds,
-                masks,
+                mask_pred_g,
+                mask_g,
             )
 
         start_ndx = batch_ndx * batch_size
@@ -318,8 +314,8 @@ class Runner:
             preds_dict[study_id].append(probability_arr[i])
             labels_dict[study_id] = label_g.cpu().detach().numpy()[i]
             if study_id in self.train_dl.dataset.log_study_ids:
-                self.log_image(epoch_ndx, input_g[i], masks[i], label_g[i], study_id,
-                               masks_preds[i], logits_g[i], mode_str)
+                self.log_image(epoch_ndx, input_g[i], mask_g[i], label_g[i], study_id,
+                               mask_pred_g[i], logits_g[i], mode_str)
 
         metrics_t[METRICS_LOSS_NDX, start_ndx:end_ndx] = cls_loss_g
 
