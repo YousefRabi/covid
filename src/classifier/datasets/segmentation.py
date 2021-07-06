@@ -69,7 +69,7 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
         try:
             mask_path = self.mask_paths[idx]
             mask = skimage.io.imread(mask_path)[..., 0]
-            mask = np.array(resize_xray(mask, 32))
+            mask = np.array(resize_xray(mask, self.image_resolution))
             mask_found = True
         except IndexError:
             mask_found = False
