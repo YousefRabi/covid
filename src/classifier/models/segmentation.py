@@ -33,11 +33,11 @@ class SegmentationModel(nn.Module):
         self.logit = nn.Linear(1536, self.num_classes)
         self.mask = nn.Sequential(
             nn.Conv2d(1536, 768, kernel_size=3, padding=1),
-            nn.BatchNorm2d(512),
+            nn.BatchNorm2d(768),
             nn.ReLU(inplace=True),
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
             nn.Conv2d(768, 512, kernel_size=3, padding=1),
-            nn.BatchNorm2d(256),
+            nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
             nn.Conv2d(512, 256, kernel_size=3, padding=1),
@@ -49,7 +49,7 @@ class SegmentationModel(nn.Module):
             nn.ReLU(inplace=True),
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
             nn.Conv2d(256, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(256),
+            nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
             nn.Conv2d(128, 1, kernel_size=1, padding=0),
