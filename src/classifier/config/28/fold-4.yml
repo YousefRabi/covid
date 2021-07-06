@@ -1,5 +1,5 @@
 data:
-  data_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/lung'
+  data_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/lung/lungs'
   opacity_masks_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/opacity_masks'
   folds_df: '/home/yousef/deep-learning/kaggle/covid/data/processed/stratified_group_kfold_split_5_42.csv'
   num_classes: 4
