@@ -1,9 +1,9 @@
 data:
-  data_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/lung/lungs'
-  opacity_masks_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/opacity_masks'
-  folds_df: '/home/yousef/deep-learning/kaggle/covid/data/processed/stratified_group_kfold_split_5_42.csv'
+  data_dir: 'data/processed/train/lung_crops/lung'
+  opacity_masks_dir: 'data/processed/train/lung_crops/opacity_masks'
+  folds_df: 'data/processed/stratified_group_kfold_split_5_42.csv'
   num_classes: 4
-  idx_fold: 2
+  idx_fold: 0
   num_folds: 5
   dataset_name: 'StudySegmentationDataset'
   image_resolution: 512
@@ -18,8 +18,9 @@ model:
 train:
   batch_size: 32
   overfit_single_batch: False
-  num_epochs: 15
+  num_epochs: 30
   snapshots: 1
+  checkpoint_path: '/home/yousef/deep-learning/kaggle/covid/trained-models/47/2021-07-04_06.42.53/fold-0/checkpoints/best_model.pth'
 
 test:
   batch_size: 32
@@ -28,19 +29,7 @@ test:
     horizontal: False
     vertical: False
 
-transforms:
-  train:
-    HorizontalFlip: True
-    VerticalFlip: True
-    Transpose: True
-    BrightnessContrast:
-      p: 0.3
-    HueSaturationValue:
-      p: 0.2
-    Blur: True
-    Noise: True
-    ShiftScaleRotate:
-      p: 0.3
+# transforms hard-coded same as 1st place finish in melanoma
 
 loss:
   name: "CrossEntropy"
@@ -51,14 +40,14 @@ loss:
 optimizer:
   name: 'Adam'
   params:
-    lr: 0.001
+    lr: 1.0e-4
 
 scheduler:
-  name: 'onecycle'
+  name: ''
   params:
-    max_lr: 0.001
+    max_lr: 1.0e-2
     div_factor: 10
-    pct_start: 0.3
+    pct_start: 0.0
     final_div_factor: 100
 
 num_workers: 8

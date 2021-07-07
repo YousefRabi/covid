@@ -11,6 +11,10 @@ from albumentations import (
     GaussNoise,
     IAAAdditiveGaussianNoise,
     RandomContrast,
+    RandomBrightness,
+    GaussianBlur,
+    ElasticTransform,
+    CLAHE,
     RandomGamma,
     RandomSizedCrop,
     RandomBrightnessContrast,
@@ -32,6 +36,33 @@ from classifier.utils.logconf import logging
 
 
 log = logging.getLogger(__name__)
+
+
+def get_first_place_melanoma_transforms(image_size):
+    transforms_train = Compose([
+        Transpose(p=0.5),
+        VerticalFlip(p=0.5),
+        HorizontalFlip(p=0.5),
+        RandomBrightness(limit=0.2, p=0.75),
+        RandomContrast(limit=0.2, p=0.75),
+        OneOf([
+            MotionBlur(blur_limit=5),
+            MedianBlur(blur_limit=5),
+            GaussianBlur(blur_limit=5),
+            GaussNoise(var_limit=(5.0, 30.0)),
+        ], p=0.7),
+
+        OneOf([
+            OpticalDistortion(distort_limit=1.0),
+            GridDistortion(num_steps=5, distort_limit=1.),
+            ElasticTransform(alpha=3),
+        ], p=0.7),
+
+        ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, border_mode=0, p=0.85),
+        Cutout(max_h_size=int(image_size * 0.375), max_w_size=int(image_size * 0.375), num_holes=1, p=0.7),
+    ])
+
+    return transforms_train
 
 
 def get_transforms(phase_config):

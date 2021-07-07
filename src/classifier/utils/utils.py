@@ -1,8 +1,13 @@
+import io
 import time
 import datetime
 import random
 
 import numpy as np
+import tensorflow as tf
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 import torch
 
@@ -10,6 +15,35 @@ from .logconf import logging
 
 
 log = logging.getLogger(__name__)
+
+
+def confusion_matrix_to_image(confusion_matrix):
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    sns.heatmap(confusion_matrix, annot=True, linewidths=0.5,
+                linecolor="red", fmt=".0f", ax=ax,
+                xticklabels=['negative', 'typical', 'indeterminate', 'atypical'],
+                yticklabels=['negative', 'typical', 'indeterminate', 'atypical'])
+
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+
+    image = plot_to_image(fig)
+    return image
+
+
+def plot_to_image(figure):
+    """Converts the matplotlib plot specified by 'figure' to a PNG image and
+    returns it. The supplied figure is closed and inaccessible after this call."""
+    # Save the plot to a PNG in memory.
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    # Closing the figure prevents it from being displayed directly inside
+    # the notebook.
+    plt.close(figure)
+    buf.seek(0)
+    image = plt.imread(buf)
+    return image
 
 
 def img2tensor(image: np.ndarray, dtype: np.dtype = np.float32):

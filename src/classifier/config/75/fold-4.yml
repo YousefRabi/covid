@@ -3,7 +3,7 @@ data:
   opacity_masks_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/opacity_masks'
   folds_df: '/home/yousef/deep-learning/kaggle/covid/data/processed/stratified_group_kfold_split_5_42.csv'
   num_classes: 4
-  idx_fold: 2
+  idx_fold: 4
   num_folds: 5
   dataset_name: 'StudySegmentationDataset'
   image_resolution: 512
@@ -16,13 +16,13 @@ model:
     pretrained: True
 
 train:
-  batch_size: 32
+  batch_size: 16
   overfit_single_batch: False
   num_epochs: 15
   snapshots: 1
 
 test:
-  batch_size: 32
+  batch_size: 16
   cls_threshold: 0.5
   tta:
     horizontal: False
