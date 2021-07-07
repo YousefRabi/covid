@@ -83,19 +83,9 @@ def find_lr(config, model, optimizer, cls_loss_func, seg_loss_func, train_loader
                 labels,
             )
 
-            masks = []
-            masks_preds = []
-            for i, mask in enumerate(masks_g):
-                if mask.sum() != 1024:  # 32x32 mask of all 1s (no mask) == 1024
-                    masks.append(mask)
-                    masks_preds.append(mask_pred_g[i])
-
-            masks = torch.stack(masks).cuda()
-            masks_preds = torch.stack(masks_preds).cuda()
-
             seg_loss_g = seg_loss_func(
-                masks_preds,
-                masks,
+                mask_pred_g,
+                masks_g,
             )
 
         loss = cls_loss_g.mean() + config.loss.params.seg_multiplier * seg_loss_g.mean()

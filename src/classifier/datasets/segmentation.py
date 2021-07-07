@@ -90,6 +90,7 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
             mask_found = True
         except Exception as e:
             log.error(f'Error {e} while reading mask at {mask_path}')
+            raise
 
         if image.ndim == 2:
             image = np.stack((image,) * 3, axis=2)
