@@ -16,13 +16,13 @@ model:
     pretrained: True
 
 train:
-  batch_size: 166
+  batch_size: 16 
   overfit_single_batch: False
-  num_epochs: 20
+  num_epochs: 22
   snapshots: 1
 
 test:
-  batch_size: 166
+  batch_size: 16 
   cls_threshold: 0.5
   tta:
     horizontal: False
@@ -67,13 +67,13 @@ optimizer:
 
 scheduler:
   name: 'warmcosine'
+  warmup:
+    apply: True
+    multiplier: 10
+    epochs: 2
   params:
     min_lr: 0.0
-    n_steps: 20
-    warmup:
-      apply: True
-      multiplier: 10
-      epochs: 2
+    n_steps: 5
 
 num_workers: 8
 device: 'cuda:0'

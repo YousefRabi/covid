@@ -18,7 +18,7 @@ model:
 train:
   batch_size: 16 
   overfit_single_batch: False
-  num_epochs: 20
+  num_epochs: 22
   snapshots: 1
 
 test:
@@ -73,7 +73,7 @@ scheduler:
     epochs: 2
   params:
     min_lr: 0.0
-    n_steps: 20
+    n_steps: 5
 
 num_workers: 8
 device: 'cuda:0'
