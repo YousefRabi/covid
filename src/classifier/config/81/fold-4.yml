@@ -59,9 +59,11 @@ loss:
     seg_multiplier: 10
 
 optimizer:
-  name: 'Adam'
+  name: 'SGD'
   params:
     lr: 0.001
+    momentum: 0.9
+    weight_decay: 1.0e-5
 
 scheduler:
   name: 'warmcosine'
