@@ -73,6 +73,9 @@ def _get_default_config():
     c.transforms.train.HueSaturationValue.hue_limit = 0.2
     c.transforms.train.HueSaturationValue.sat_limit = 0.3
     c.transforms.train.HueSaturationValue.val_limit = 0.2
+    c.transforms.train.CLAHE = edict()
+    c.transforms.train.CLAHE.p = 0
+    c.transforms.train.CLAHE.clip_limit = 3
     c.transforms.train.Gamma = edict()
     c.transforms.train.Gamma.p = 0
     c.transforms.train.Gamma.limit = (80, 120)
