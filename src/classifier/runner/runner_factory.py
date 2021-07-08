@@ -155,8 +155,12 @@ class Runner:
         log.info("Starting {}, {}".format(type(self).__name__, self.config))
 
         score = 0.0
-        for epoch_ndx in range(1, self.config.train.num_epochs + 1):
 
+        if self.config.scheduler.warmup.apply:
+            self.optimizer.zero_grad()
+            self.optimizer.step()
+
+        for epoch_ndx in range(1, self.config.train.num_epochs + 1):
             log.info("Epoch {} of {}, {}/{} batches of size {}".format(
                 epoch_ndx,
                 self.config.train.num_epochs,
@@ -203,6 +207,9 @@ class Runner:
         return trn_loss
 
     def do_training(self, epoch_ndx):
+        if self.config.scheduler.warmup.apply:
+            self.scheduler.step(epoch_ndx)
+
         self.model.train()
         trn_metrics_t = torch.zeros(
             METRICS_SIZE,
@@ -239,7 +246,7 @@ class Runner:
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-            if self.config.scheduler.name == 'onecycle':
+            if self.config.scheduler.name in 'onecycle':
                 self.scheduler.step()
 
         self.total_training_samples_count += len(self.train_dl.dataset)

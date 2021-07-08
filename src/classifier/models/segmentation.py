@@ -25,12 +25,12 @@ class SegmentationModel(nn.Module):
         self.b6 = net.blocks[5]
         self.b7 = net.blocks[6]
         self.b8 = nn.Sequential(
-            net.conv_head,  # 384, 1536
+            net.conv_head,  # 640, 1280
             net.bn2,
             net.act2,
         )
 
-        self.logit = nn.Linear(1536, self.num_classes)
+        self.logit = nn.Linear(1280, self.num_classes)
         self.mask = nn.Sequential(
             nn.Conv2d(1536, 768, kernel_size=3, padding=1),
             nn.BatchNorm2d(768),
