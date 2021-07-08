@@ -51,7 +51,7 @@ class SchedulerBuilder:
         scheduler = CosineAnnealingWarmRestarts(self.optimizer,
                                                 T_0=self.scheduler_step,
                                                 eta_min=self.config.scheduler.params.min_lr,
-                                                last_epoch=self.config.train.num_epochs)
+                                                )
         return scheduler
 
     def halfcosine(self):
