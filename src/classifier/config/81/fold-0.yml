@@ -6,7 +6,7 @@ data:
   idx_fold: 0
   num_folds: 5
   dataset_name: 'StudySegmentationDataset'
-  image_resolution: 768
+  image_resolution: 468
 
 model:
   arch: 'SegmentationModel'
@@ -16,13 +16,13 @@ model:
     pretrained: True
 
 train:
-  batch_size: 8 
+  batch_size: 16 
   overfit_single_batch: False
   num_epochs: 20
   snapshots: 1
 
 test:
-  batch_size: 8 
+  batch_size: 16 
   cls_threshold: 0.5
   tta:
     horizontal: False
