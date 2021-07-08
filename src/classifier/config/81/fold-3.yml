@@ -6,7 +6,7 @@ data:
   idx_fold: 3
   num_folds: 5
   dataset_name: 'StudySegmentationDataset'
-  image_resolution: 468
+  image_resolution: 448
 
 model:
   arch: 'SegmentationModel'
