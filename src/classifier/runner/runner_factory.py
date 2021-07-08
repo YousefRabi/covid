@@ -209,9 +209,6 @@ class Runner:
         if self.config.scheduler.warmup.apply:
             self.scheduler.step(epoch_ndx)
 
-        if epoch_ndx == 3:
-            self.scheduler.step(epoch_ndx)  # bug fix
-
         self.model.train()
         trn_metrics_t = torch.zeros(
             METRICS_SIZE,
