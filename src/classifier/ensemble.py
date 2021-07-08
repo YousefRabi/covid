@@ -33,7 +33,7 @@ def main():
 
     oof_preds = np.zeros((len(oof_csvs[0]), 4, len(oof_filenames)))
     for i, oof_csv in enumerate(oof_csvs):
-        oof_preds[:, :, i] = oof_csv.pred.values
+        oof_preds[:, :, i] = oof_csv[['negative', 'typical', 'indeterminate', 'atypical']].values
 
     targets = oof_csvs[0].label.values
     study_ids = oof_csvs[0].study_id.values
@@ -42,6 +42,7 @@ def main():
 
     ensemble_model_indices, ensemble_model_weights, ensemble_score = get_best_ensemble(targets,
                                                                                        oof_preds,
+                                                                                       study_ids,
                                                                                        max_model_ix,
                                                                                        max_model_score,)
 
@@ -66,8 +67,8 @@ def get_max_model_ix_and_score(targets, oof_preds, study_ids):
     '''
     model_scores = []
     for i in range(oof_preds.shape[2]):
-        preds_arr, labels_arr = get_preds_and_labels_arr(targets, oof_preds[:, :, i], study_ids)
-        mean_ap = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
+        labels_arr, preds_arr = get_labels_and_preds_arr(targets, oof_preds[:, :, i], study_ids)
+        mean_ap, _ = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
         mean_ap = mean_ap * 2/3
         model_scores.append(mean_ap)
         print(f'Model {i} has OOF mAP = {mean_ap:.4f}')
@@ -141,8 +142,8 @@ def get_best_ensemble(targets,
             for weight_res in range(weight_resolution):
                 tmp = (weight_res / weight_resolution * oof_preds[:, :, current_model_ix] +
                        (1 - weight_res / weight_resolution) * current_ensemble)
-                preds_arr, labels_arr = get_preds_and_labels_arr(targets, tmp, study_ids)
-                mean_ap = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
+                labels_arr, preds_arr = get_labels_and_preds_arr(targets, tmp, study_ids)
+                mean_ap, _ = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
                 mean_ap = mean_ap * 2/3
 
                 if mean_ap > current_best_oof_score:
@@ -178,7 +179,7 @@ def get_best_ensemble(targets,
     return ensemble_models, model_weights, max_model_score
 
 
-def get_preds_and_labels_arr(targets, oof_preds, study_ids):
+def get_labels_and_preds_arr(targets, oof_preds, study_ids):
     labels_arr = ([[study_id, value, 0, 1, 0, 1] for study_id, value in zip(study_ids, targets)])
 
     preds_arr = []
