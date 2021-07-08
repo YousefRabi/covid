@@ -61,7 +61,7 @@ loss:
 optimizer:
   name: 'SGD'
   params:
-    lr: 0.001
+    lr: 1.0e-3
     momentum: 0.9
     weight_decay: 1.0e-5
 
@@ -72,7 +72,7 @@ scheduler:
     multiplier: 1
     epochs: 2
   params:
-    min_lr: 0.0
+    min_lr: 1.0e-4
     n_steps: 5
 
 num_workers: 8
