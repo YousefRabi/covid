@@ -169,7 +169,6 @@ class Runner:
                 self.config.train.batch_size,
             ))
 
-            log.info(f'LR - {self.optimizer.param_groups[0]["lr"]}')
             trn_metrics_t, labels_arr, preds_arr, confusion_matrix_dict = self.do_training(epoch_ndx)
             self.log_metrics(epoch_ndx, 'trn', trn_metrics_t, labels_arr, preds_arr, confusion_matrix_dict)
 
@@ -224,6 +223,7 @@ class Runner:
         preds_dict = defaultdict(list)
         confusion_matrix_dict = {'labels': [], 'preds': []}
 
+        log.info(f'LR - {self.optimizer.param_groups[0]["lr"]}')
         batch_iter = enumerate_with_estimate(
             self.train_dl,
             "E{} Training".format(epoch_ndx),
