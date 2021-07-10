@@ -116,9 +116,6 @@ class Runner:
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = self.config.optimizer.params.lr
 
-            if self.scheduler is not None:
-                self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-
             self.best_score = checkpoint['best_score']
 
             print('Loaded model from checkpoint: ', self.config.train.checkpoint_path)
