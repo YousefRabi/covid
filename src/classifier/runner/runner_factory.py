@@ -246,7 +246,7 @@ class Runner:
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-            if self.config.scheduler.name in 'onecycle':
+            if self.config.scheduler.name in ['onecycle', 'cosine']:
                 self.scheduler.step()
 
         self.total_training_samples_count += len(self.train_dl.dataset)
