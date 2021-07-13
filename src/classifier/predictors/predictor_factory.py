@@ -16,11 +16,10 @@ log = logging.getLogger(__name__)
 
 
 class Predictor:
-    def __init__(self, config: EasyDict, checkpoint_path: str, output_path: str):
+    def __init__(self, config: EasyDict, checkpoint_path: str):
         self.config = config
         self.checkpoint_path = checkpoint_path
         self.df = pd.read_csv(config.data.folds_df)
-        self.output_path = output_path
 
         self.transforms = False
 
@@ -76,7 +75,7 @@ class Predictor:
 
         preds_df = self.organize_preds_into_df(all_preds)
 
-        preds_df.to_csv(self.output_path, index=False)
+        return preds_df
 
     def do_prediction(self, dl):
         study_preds = defaultdict(list)
@@ -101,12 +100,24 @@ class Predictor:
         input_g = input_t.to(self.device, non_blocking=True)
 
         with torch.no_grad():
-            logits_g = self.model(input_g)
-            probability_arr = torch.nn.functional.softmax(logits_g, dim=-1).cpu().detach().numpy()
+            logits = self.model(input_g).detach()
+            logits = logits + self.model(input_g.flip(2)).detach()
+            logits = logits + self.model(input_g.flip(3)).detach()
+            logits = logits + self.model(input_g.flip(2).flip(3)).detach()
+            input_g = input_g.transpose(2, 3)
+            logits = logits + self.model(input_g).detach()
+            logits = logits + self.model(input_g.flip(2)).detach()
+            logits = logits + self.model(input_g.flip(3)).detach()
+            logits = logits + self.model(input_g.flip(2).flip(3)).detach()
+            logits = logits / 8
+            probability_arr = torch.nn.functional.softmax(logits, dim=-1).cpu().detach().numpy()
 
         batch_preds_dict = dict(zip(study_id_list, probability_arr))
 
         return batch_preds_dict
+
+    def softmax(logits):
+        return torch.nn.functional.softmax(logits, dim=-1).detach()
 
     def organize_preds_into_df(self, preds_dict):
         preds_list = []
