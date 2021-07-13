@@ -1,3 +1,4 @@
+from pathlib import Path
 from argparse import ArgumentParser
 
 import pandas as pd
@@ -28,9 +29,15 @@ def main():
 
     folds_preds_dfs = []
     config_paths = sorted(list(args.configs))
+
+    config = load_config(config_paths[0])
+    file_handler = logging.FileHandler(Path(config.work_dir).parent / 'predict.log')
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.INFO)
+
     checkpoint_paths = sorted(list(args.checkpoint_paths))
-    print('config_paths: ', config_paths)
-    print('checkpoint_paths: ', checkpoint_paths)
+    log.info(f'config_paths: {config_paths}')
+    log.info(f'checkpoint_paths: {checkpoint_paths}')
 
     oof = len(config_paths) > 1
 
@@ -59,7 +66,10 @@ def main():
         labels_arr = get_labels_arr_from_df(labels_df)
         preds_arr = get_preds_arr_from_df(folds_preds)
 
-        mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
+        mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=True)
+
+        log.info('mean_ap: {mean_ap}')
+        log.info('average_precisions: {average_precisions}')
 
     else:
         preds_df.to_csv(args.output_path, index=False)
