@@ -9,6 +9,6 @@ def get_preds_records_from_yolo_preds_folder(yolo_preds_folder):
             bbox_preds = [bbox_pred.split() for bbox_pred in bbox_preds]
             for bbox_pred in bbox_preds:
                 bbox_pred = [float(x) for x in bbox_pred]
-            preds_records.append([path.stem] + bbox_pred)
+        preds_records.append([path.stem] + bbox_pred)
     
     return preds_records
