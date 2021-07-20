@@ -94,8 +94,6 @@ class Predictor:
             for study_id, study_pred in batch_preds_dict.items():
                 study_preds[study_id].append(study_pred)
 
-            break
-
         return study_preds
 
     def predict(self, batch_tup):
