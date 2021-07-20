@@ -68,8 +68,8 @@ def main():
 
         mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=True)
 
-        log.info('mean_ap: {mean_ap}')
-        log.info('average_precisions: {average_precisions}')
+        log.info(f'mean_ap: {mean_ap}')
+        log.info(f'average_precisions: {average_precisions}')
 
     else:
         preds_df.to_csv(args.output_path, index=False)

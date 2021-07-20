@@ -10,6 +10,7 @@ from classifier.utils.logconf import logging
 from classifier.utils.utils import enumerate_with_estimate
 from classifier.models import get_model
 from classifier.datasets import get_dataloader
+from classifier.losses import LossBuilder
 
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,9 @@ class Predictor:
 
         self.device = self.config.device
         self.model = self.init_model()
+
+        loss_builder = LossBuilder(config)
+        self.cls_loss_func = loss_builder.get_loss()
 
     def init_model(self):
         model = get_model(self.config)
@@ -65,13 +69,11 @@ class Predictor:
         return get_dataloader(self.config, self.transforms, 'valid')
 
     def run(self):
-        train_dl = self.init_train_dl()
         val_dl = self.init_val_dl()
 
-        trn_study_preds = self.do_prediction(train_dl)
         val_study_preds = self.do_prediction(val_dl)
 
-        all_preds = {**trn_study_preds, **val_study_preds}
+        all_preds = {**val_study_preds}
 
         preds_df = self.organize_preds_into_df(all_preds)
 
@@ -92,12 +94,15 @@ class Predictor:
             for study_id, study_pred in batch_preds_dict.items():
                 study_preds[study_id].append(study_pred)
 
+            break
+
         return study_preds
 
     def predict(self, batch_tup):
         input_t, mask_t, label_t, study_id_list = batch_tup
 
         input_g = input_t.to(self.device, non_blocking=True)
+        label_g = label_t.to(self.device, non_blocking=True)
 
         with torch.no_grad():
             logits = self.model(input_g).detach()
@@ -110,9 +115,13 @@ class Predictor:
             logits = logits + self.model(input_g.flip(3)).detach()
             logits = logits + self.model(input_g.flip(2).flip(3)).detach()
             logits = logits / 8
-            probability_arr = torch.nn.functional.softmax(logits, dim=-1).cpu().detach().numpy()
 
-        batch_preds_dict = dict(zip(study_id_list, probability_arr))
+            loss = self.cls_loss_func(logits, label_g).unsqueeze(dim=-1).cpu().detach().numpy()
+
+            probability_arr = torch.nn.functional.softmax(logits, dim=-1).cpu().detach().numpy()
+            preds_arr = np.hstack([probability_arr, loss])
+
+        batch_preds_dict = dict(zip(study_id_list, preds_arr))
 
         return batch_preds_dict
 
@@ -127,7 +136,7 @@ class Predictor:
             preds_list.append([study_id] + study_pred.tolist())
 
         preds_df = pd.DataFrame(preds_list)
-        preds_df.columns = ['study_id', 'negative', 'typical', 'indeterminate', 'atypical']
+        preds_df.columns = ['study_id', 'negative', 'typical', 'indeterminate', 'atypical', 'loss']
         preds_df['label'] = preds_df['study_id'].apply(
             lambda x: self.df[self.df['study_id'] == x]['label'].values[0]
         )
