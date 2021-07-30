@@ -1,9 +1,9 @@
 data:
   data_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/lung/lungs'
-  opacity_masks_dir: '/ssd1/deep-learning/kaggle/covid/data/processed/train-lungs/opacity_masks'
+  opacity_masks_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/opacity_masks'
   folds_df: '/home/yousef/deep-learning/kaggle/covid/data/processed/stratified_group_kfold_split_5_42.csv'
   num_classes: 4
-  idx_fold: 4
+  idx_fold: 2
   num_folds: 5
   dataset_name: 'StudySegmentationDataset'
   image_resolution: 448
@@ -53,8 +53,12 @@ transforms:
       num_holes: 2
 
 loss:
-  name: "CrossEntropy"
+  name: "BiTemperedSoftmax"
   params:
+    label_smoothing: 0.1
+    t1: 0.3
+    t2: 1.05
+    num_iters: 10
     reduction: 'none'
     seg_multiplier: 10
 
@@ -66,9 +70,12 @@ optimizer:
     weight_decay: 1.0e-5
 
 scheduler:
-  name: 'cosine'
+  name: 'onecycle'
   params:
-    min_lr: 0
+    max_lr: 1.0e-2
+    div_factor: 100
+    pct_start: 0.2
+    final_div_factor: 300
 
 num_workers: 8
 device: 'cuda:0'
