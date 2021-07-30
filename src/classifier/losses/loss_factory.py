@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from classifier.utils.logconf import logging
+from .lovasz_losses import lovasz_hinge
 
 
 log = logging.getLogger(__name__)
