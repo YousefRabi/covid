@@ -30,7 +30,11 @@ class SegmentationModel(nn.Module):
             net.act2,
         )
 
-        self.logit = nn.Linear(1280, self.num_classes)
+        self.logit = nn.Sequential(
+            nn.Conv1d(1280, 1280, 5),
+            nn.Dropout(0.5),
+            nn.Linear(1280, self.num_classes)
+        )
         self.mask = nn.Sequential(
             nn.Conv2d(1280, 768, kernel_size=3, padding=1),
             nn.BatchNorm2d(768),
@@ -70,7 +74,7 @@ class SegmentationModel(nn.Module):
 
         mask = self.mask(x)
 
-        x = F.adaptive_avg_pool2d(x, 1).reshape(batch_size, -1)
+        x = F.adaptive_avg_pool2d(x, (5, 5)).reshape(batch_size, -1)
         logit = self.logit(x)
 
         if return_mask:
