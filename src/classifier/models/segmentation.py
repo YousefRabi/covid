@@ -31,8 +31,10 @@ class SegmentationModel(nn.Module):
         )
 
         self.logit = nn.Sequential(
-            nn.Conv1d(1280, 1280, 5),
+            nn.Conv2d(1280, 1280, 5, groups=1280),
+            nn.Conv2d(1280, 1280, 1),
             nn.Dropout(0.5),
+            nn.Flatten(),
             nn.Linear(1280, self.num_classes)
         )
         self.mask = nn.Sequential(
@@ -60,8 +62,6 @@ class SegmentationModel(nn.Module):
         )
 
     def forward(self, x, return_mask=False):
-        batch_size = len(x)
-
         x = self.b0(x)
         x = self.b1(x)
         x = self.b2(x)
@@ -74,7 +74,7 @@ class SegmentationModel(nn.Module):
 
         mask = self.mask(x)
 
-        x = F.adaptive_avg_pool2d(x, (5, 5)).reshape(batch_size, -1)
+        x = F.adaptive_avg_pool2d(x, (5, 5))
         logit = self.logit(x)
 
         if return_mask:
