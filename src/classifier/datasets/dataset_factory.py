@@ -73,6 +73,7 @@ def get_dataloader(config, transforms, split):
                             batch_size=batch_size,
                             sampler=sampler,
                             num_workers=config.num_workers,
+                            drop_last=True,
                             pin_memory=True,)
 
     return dataloader
