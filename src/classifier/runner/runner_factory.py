@@ -20,7 +20,7 @@ from map_boxes import mean_average_precision_for_boxes
 from classifier.models import get_model
 from classifier.optimizers import get_optimizer
 from classifier.datasets import get_dataloader
-from classifier.transforms import get_transforms, get_first_place_melanoma_transforms
+from classifier.transforms import get_transforms, get_first_place_melanoma_transforms, Mixup
 from classifier.losses import LossBuilder
 from classifier.schedulers import SchedulerBuilder
 from classifier.utils.utils import (fix_seed, enumerate_with_estimate,
@@ -63,6 +63,7 @@ class Runner:
         self.trn_transforms = get_transforms(config.transforms.train)
         log.info(f'train transforms: {self.trn_transforms}')
         self.val_transforms = get_transforms(config.transforms.test)
+        self.mixup_fn = Mixup(**config.mixup) if config.mixup.prob > 0 else None
 
         self.train_dl = self.init_train_dl()
         self.val_dl = self.init_val_dl()
@@ -291,6 +292,10 @@ class Runner:
         input_g = input_t.to(self.device, non_blocking=True)
         mask_g = mask_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
+
+        if self.mixup_fn is not None:
+            input_g, label_g = self.mixup_fn(input_g, label_g)
+            mask_g, label_g = self.mixup_fn(mask_g, label_g)
 
         study_id_arr = np.array(study_id_list)
 
