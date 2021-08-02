@@ -54,6 +54,7 @@ transforms:
 
 mixup:
   mixup_alpha: 1.0
+  prob: 0.5
   num_classes: 4
 
 loss:
