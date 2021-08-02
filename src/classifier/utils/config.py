@@ -180,7 +180,7 @@ def _get_default_config():
     c.mixup = edict()
     c.mixup.mixup_alpha = 0.0
     c.mixup.cutmix_alpha = 0.0
-    c.mixup.cutmix_minmax = 0.0
+    c.mixup.cutmix_minmax = None
     c.mixup.prob = 0.0
     c.mixup.switch_prob = 0.0
     c.mixup.mode = 'batch'

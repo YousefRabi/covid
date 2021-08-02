@@ -12,6 +12,7 @@ from torch.cuda.amp import autocast
 
 from datasets.dataset_factory import get_dataloader
 from transforms.transform_factory import get_transforms
+from transforms import Mixup
 from models.model_factory import get_model
 from losses.loss_factory import LossBuilder
 from optimizers.optimizer_factory import get_optimizer
@@ -34,6 +35,7 @@ def run(args):
     fix_seed(config.seed)
 
     train_transforms = get_transforms(config.transforms.train)
+    mixup_fn = Mixup(**config.mixup) if config.mixup.prob > 0.0 else None
 
     print('train_transforms: ', train_transforms)
     train_loader = get_dataloader(config, train_transforms, split='train')
@@ -48,11 +50,11 @@ def run(args):
         model = torch.nn.DataParallel(model)
     model.to(config.device)
 
-    find_lr(config, model, optimizer, cls_loss_func, seg_loss_func,
+    find_lr(config, model, optimizer, mixup_fn, cls_loss_func, seg_loss_func,
             train_loader, scaler, final_value=args.max_lr)
 
 
-def find_lr(config, model, optimizer, cls_loss_func, seg_loss_func, train_loader,
+def find_lr(config, model, optimizer, mixup_fn, cls_loss_func, seg_loss_func, train_loader,
             scaler, init_value=1e-8, final_value=10., beta=0.98):
 
     num = len(train_loader) - 1
@@ -75,6 +77,9 @@ def find_lr(config, model, optimizer, cls_loss_func, seg_loss_func, train_loader
         masks_g = masks_t.cuda()
         labels = labels.cuda()
         optimizer.zero_grad()
+
+        if mixup_fn is not None:
+            inputs, masks_g, labels = mixup_fn(inputs, masks_g, labels)
 
         with autocast():
             logits, mask_pred_g = model(inputs, return_mask=True)

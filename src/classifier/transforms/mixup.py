@@ -193,7 +193,7 @@ class Mixup:
         lam_batch = np.concatenate((lam_batch, lam_batch[::-1]))
         return torch.tensor(lam_batch, device=x.device, dtype=x.dtype).unsqueeze(1)
 
-    def _mix_batch(self, x):
+    def _mix_batch(self, x, masks):
         lam, use_cutmix = self._params_per_batch()
         if lam == 1.:
             return 1.
@@ -201,21 +201,24 @@ class Mixup:
             (yl, yh, xl, xh), lam = cutmix_bbox_and_lam(
                 x.shape, lam, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam)
             x[:, :, yl:yh, xl:xh] = x.flip(0)[:, :, yl:yh, xl:xh]
+            masks[:, :, yl:yh, xl:xh] = masks.flip(0)[:, :, yl:yh, xl:xh]
         else:
             x_flipped = x.flip(0).mul_(1. - lam)
             x.mul_(lam).add_(x_flipped)
+            masks_flipped = masks.flip(0).mul_(1. - lam)
+            masks.mul_(lam).add_(masks_flipped)
         return lam
 
-    def __call__(self, x, target):
+    def __call__(self, x, masks, target):
         assert len(x) % 2 == 0, 'Batch size should be even when using this'
         if self.mode == 'elem':
             lam = self._mix_elem(x)
         elif self.mode == 'pair':
             lam = self._mix_pair(x)
         else:
-            lam = self._mix_batch(x)
+            lam = self._mix_batch(x, masks)
         target = mixup_target(target, self.num_classes, lam, self.label_smoothing)
-        return x, target
+        return x, masks, target
 
 
 class FastCollateMixup(Mixup):
