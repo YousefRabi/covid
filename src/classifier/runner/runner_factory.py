@@ -293,7 +293,7 @@ class Runner:
         mask_g = mask_t.to(self.device, non_blocking=True)
         label_g = label_t.to(self.device, non_blocking=True)
 
-        if self.mixup_fn is not None:
+        if self.mixup_fn is not None and mode_str == 'trn':
             input_g, mask_g, label_g = self.mixup_fn(input_g, mask_g, label_g)
 
         study_id_arr = np.array(study_id_list)
@@ -337,7 +337,11 @@ class Runner:
 
         writer = getattr(self, mode_str + '_writer')
 
-        label = id2label[label.detach().cpu().item()]
+        if self.mixup_fn is not None:
+            label = str(label.detach().cpu().numpy().tolist())
+        else:
+            label = id2label[label.detach().cpu().item()]
+
         prediction = id2label[prediction.item()]
 
         if epoch_ndx == 1:
@@ -414,26 +418,8 @@ class Runner:
         metrics_dict = {}
         metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
 
-        labels_arr = np.array([[key, value, 0, 1, 0, 1] for key, value in labels_dict.items()])
-
-        preds_arr = []
-        for key, value in preds_dict.items():
-            mean_preds = np.mean(value, axis=0)
-            for i, cls_pred in enumerate(mean_preds):
-                preds_arr.append([key, i, cls_pred, 0, 1, 0, 1])
-        preds_arr = np.array(preds_arr)
-
-        mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
-        # Multiply by 2 /3 because LB metric is mAP and study ids have 4 labels and image ids have 2 labels
-        metrics_dict['map/negative'] = average_precisions['0'][0]
-        metrics_dict['map/typical'] = average_precisions['1'][0]
-        metrics_dict['map/indeterminate'] = average_precisions['2'][0]
-        metrics_dict['map/atypical'] = average_precisions['3'][0]
-        metrics_dict['map/all'] = mean_ap
-
         log.info(
             ("E{} {:8} {loss/all:.4f} loss, "
-             + "{map/all:.4f} mAP@0.5"
              ).format(
                 epoch_ndx,
                 mode_str,
@@ -441,17 +427,36 @@ class Runner:
             )
         )
 
-        log.info(
-            ("E{} {:8} {map/negative:.4f} mAP/negative, "
-             + "{map/typical:.4f} mAP/typical "
-             + "{map/indeterminate:.4f} mAP/indeterminate "
-             + "{map/atypical:.4f} mAP/atypical "
-             ).format(
-                epoch_ndx,
-                mode_str,
-                **metrics_dict,
+        if mode_str == 'val':
+            labels_arr = np.array([[key, value, 0, 1, 0, 1] for key, value in labels_dict.items()])
+
+            preds_arr = []
+            for key, value in preds_dict.items():
+                mean_preds = np.mean(value, axis=0)
+                for i, cls_pred in enumerate(mean_preds):
+                    preds_arr.append([key, i, cls_pred, 0, 1, 0, 1])
+            preds_arr = np.array(preds_arr)
+
+            mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
+            # Multiply by 2 /3 because LB metric is mAP and study ids have 4 labels and image ids have 2 labels
+            metrics_dict['map/negative'] = average_precisions['0'][0]
+            metrics_dict['map/typical'] = average_precisions['1'][0]
+            metrics_dict['map/indeterminate'] = average_precisions['2'][0]
+            metrics_dict['map/atypical'] = average_precisions['3'][0]
+            metrics_dict['map/all'] = mean_ap
+
+            log.info(
+                ("E{} {:8} {map/all:.4f} mAP@0.5, "
+                 + "{map/negative:.4f} mAP/negative, "
+                 + "{map/typical:.4f} mAP/typical "
+                 + "{map/indeterminate:.4f} mAP/indeterminate "
+                 + "{map/atypical:.4f} mAP/atypical "
+                 ).format(
+                    epoch_ndx,
+                    mode_str,
+                    **metrics_dict,
+                )
             )
-        )
 
         writer = getattr(self, mode_str + '_writer')
 
@@ -460,16 +465,21 @@ class Runner:
         for key, value in metrics_dict.items():
             writer.add_scalar(prefix_str + key, value, self.total_training_samples_count)
 
-        cm = confusion_matrix(confusion_matrix_dict['labels'], confusion_matrix_dict['preds'])
-        confusion_matrix_image = confusion_matrix_to_image(cm)
+        if mode_str == 'val':
 
-        writer.add_image(
-            f'{mode_str}-confusion-matrix',
-            confusion_matrix_image,
-            self.total_training_samples_count,
-            dataformats='HWC',
-        )
+            cm = confusion_matrix(confusion_matrix_dict['labels'], confusion_matrix_dict['preds'])
+            confusion_matrix_image = confusion_matrix_to_image(cm)
+
+            writer.add_image(
+                f'{mode_str}-confusion-matrix',
+                confusion_matrix_image,
+                self.total_training_samples_count,
+                dataformats='HWC',
+            )
 
         writer.flush()
+
+        if mode_str == 'trn':
+            return metrics_dict['loss/all']
 
         return metrics_dict['map/all']

@@ -70,6 +70,8 @@ class LossBuilder:
 
     def SoftCrossEntropy(self):
         def loss_fn(logits, targets):
+            if targets.ndim == 1:
+                targets = F.one_hot(targets, num_classes=4)
             criterion = SoftCrossEntropyLoss(reduction=self.config.loss.params.reduction)
             return criterion(logits, targets)
         return loss_fn
