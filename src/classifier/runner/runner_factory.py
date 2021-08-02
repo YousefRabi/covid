@@ -294,8 +294,7 @@ class Runner:
         label_g = label_t.to(self.device, non_blocking=True)
 
         if self.mixup_fn is not None:
-            input_g, label_g = self.mixup_fn(input_g, label_g)
-            mask_g, label_g = self.mixup_fn(mask_g, label_g)
+            input_g, mask_g, label_g = self.mixup_fn(input_g, mask_g, label_g)
 
         study_id_arr = np.array(study_id_list)
 
