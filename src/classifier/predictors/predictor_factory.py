@@ -104,15 +104,6 @@ class Predictor:
 
         with torch.no_grad():
             logits = self.model(input_g).detach()
-            logits = logits + self.model(input_g.flip(2)).detach()
-            logits = logits + self.model(input_g.flip(3)).detach()
-            logits = logits + self.model(input_g.flip(2).flip(3)).detach()
-            input_g = input_g.transpose(2, 3)
-            logits = logits + self.model(input_g).detach()
-            logits = logits + self.model(input_g.flip(2)).detach()
-            logits = logits + self.model(input_g.flip(3)).detach()
-            logits = logits + self.model(input_g.flip(2).flip(3)).detach()
-            logits = logits / 8
 
             loss = self.cls_loss_func(logits, label_g).unsqueeze(dim=-1).cpu().detach().numpy()
 
