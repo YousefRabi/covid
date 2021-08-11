@@ -177,6 +177,17 @@ def _get_default_config():
     c.transforms.test.AssertShape.height = 256
     c.transforms.test.AssertShape.width = 256
 
+    c.mixup = edict()
+    c.mixup.mixup_alpha = 0.0
+    c.mixup.cutmix_alpha = 0.0
+    c.mixup.cutmix_minmax = None
+    c.mixup.prob = 0.0
+    c.mixup.switch_prob = 0.0
+    c.mixup.mode = 'batch'
+    c.mixup.correct_lam = True
+    c.mixup.label_smoothing = 0.1
+    c.mixup.num_classes = 4
+
     c.loss = edict()
     c.loss.name = 'BCE'
     c.loss.params = edict()

@@ -1,0 +1,82 @@
+data:
+  data_dir: '/home/yousef/deep-learning/kaggle/covid/data/processed/train/lung_crops/lung/lungs'
+  opacity_masks_dir: '/ssd1/deep-learning/kaggle/covid/data/processed/train-lungs/opacity_masks'
+  folds_df: '/home/yousef/deep-learning/kaggle/covid/data/processed/stratified_group_kfold_split_5_42.csv'
+  num_classes: 4
+  idx_fold: 1
+  num_folds: 5
+  dataset_name: 'StudySegmentationDataset'
+  image_resolution: 448
+
+model:
+  arch: 'SegmentationModel'
+  params:
+    encoder_name: 'tf_efficientnetv2_l_in21ft1k'
+    num_classes: 4
+    pretrained: True
+
+train:
+  batch_size: 16 
+  overfit_single_batch: False
+  num_epochs: 10
+  snapshots: 1
+
+test:
+  batch_size: 16 
+  cls_threshold: 0.5
+  tta:
+    horizontal: False
+    vertical: False
+
+transforms:
+  train:
+    HorizontalFlip: True
+    VerticalFlip: True
+    Transpose: True
+    BrightnessContrast:
+      p: 0.5
+      brightness_limit: 0.25
+      contrast_limit: 0.25
+    HueSaturationValue:
+      p: 0.5
+    CLAHE:
+      p: 0.5
+      clip_limit: 3
+    Blur: True
+    Noise: True
+    ShiftScaleRotate:
+      p: 0.3
+    Cutout:
+      p: 0.5
+      max_h_size: 51.2
+      max_w_size: 51.2
+      num_holes: 2
+
+mixup:
+  mixup_alpha: 1.0
+  prob: 0.5
+  num_classes: 4
+
+loss:
+  name: "SoftCrossEntropy"
+  params:
+    reduction: 'none'
+    seg_multiplier: 10
+
+optimizer:
+  name: 'SGD'
+  params:
+    lr: 1.0e-2
+    momentum: 0.9
+    weight_decay: 1.0e-5
+
+scheduler:
+  name: 'cosine'
+  params:
+    min_lr: 0
+
+num_workers: 8
+device: 'cuda:0'
+multi_gpu: False
+debug: False
+work_dir: 'build/'

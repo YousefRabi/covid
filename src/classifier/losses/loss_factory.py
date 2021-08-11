@@ -1,6 +1,8 @@
 from __future__ import print_function, division
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
+from torch.nn.modules.loss import _WeightedLoss
 
 from classifier.utils.logconf import logging
 from .lovasz_losses import lovasz_hinge
@@ -65,6 +67,14 @@ class LossBuilder:
                                              self.config.loss.params.label_smoothing,
                                              self.config.loss.params.num_iters)
             return loss
+        return loss_fn
+
+    def SoftCrossEntropy(self):
+        def loss_fn(logits, targets):
+            if targets.ndim == 1:
+                targets = F.one_hot(targets, num_classes=4)
+            criterion = SoftCrossEntropyLoss(reduction=self.config.loss.params.reduction)
+            return criterion(logits, targets)
         return loss_fn
 
 
@@ -168,3 +178,25 @@ def bi_tempered_logistic_loss(activations, labels, t1, t2, label_smoothing=0.0, 
     loss_values = temp1 - temp2
 
     return torch.sum(loss_values, dim=-1)
+
+
+class SoftCrossEntropyLoss(_WeightedLoss):
+    def __init__(self, weight=None, reduction='mean'):
+        super().__init__(weight=weight, reduction=reduction)
+        self.weight = weight
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        lsm = F.log_softmax(inputs, -1)
+
+        if self.weight is not None:
+            lsm = lsm * self.weight.unsqueeze(0)
+
+        loss = -(targets * lsm).sum(-1)
+
+        if self.reduction == 'sum':
+            loss = loss.sum()
+        elif self.reduction == 'mean':
+            loss = loss.mean()
+
+        return loss
