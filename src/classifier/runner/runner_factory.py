@@ -116,9 +116,6 @@ class Runner:
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = self.config.optimizer.params.lr
 
-            if self.scheduler is not None:
-                self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-
             self.best_score = checkpoint['best_score']
 
             print('Loaded model from checkpoint: ', self.config.train.checkpoint_path)
@@ -155,8 +152,12 @@ class Runner:
         log.info("Starting {}, {}".format(type(self).__name__, self.config))
 
         score = 0.0
-        for epoch_ndx in range(1, self.config.train.num_epochs + 1):
 
+        if self.config.scheduler.warmup.apply:
+            self.optimizer.zero_grad()
+            self.optimizer.step()
+
+        for epoch_ndx in range(1, self.config.train.num_epochs + 1):
             log.info("Epoch {} of {}, {}/{} batches of size {}".format(
                 epoch_ndx,
                 self.config.train.num_epochs,
@@ -165,7 +166,6 @@ class Runner:
                 self.config.train.batch_size,
             ))
 
-            log.info(f'LR - {self.optimizer.param_groups[0]["lr"]}')
             trn_metrics_t, labels_arr, preds_arr, confusion_matrix_dict = self.do_training(epoch_ndx)
             self.log_metrics(epoch_ndx, 'trn', trn_metrics_t, labels_arr, preds_arr, confusion_matrix_dict)
 
@@ -203,6 +203,9 @@ class Runner:
         return trn_loss
 
     def do_training(self, epoch_ndx):
+        if self.config.scheduler.warmup.apply:
+            self.scheduler.step(epoch_ndx)
+
         self.model.train()
         trn_metrics_t = torch.zeros(
             METRICS_SIZE,
@@ -214,6 +217,7 @@ class Runner:
         preds_dict = defaultdict(list)
         confusion_matrix_dict = {'labels': [], 'preds': []}
 
+        log.info(f'LR - {self.optimizer.param_groups[0]["lr"]}')
         batch_iter = enumerate_with_estimate(
             self.train_dl,
             "E{} Training".format(epoch_ndx),
@@ -239,7 +243,7 @@ class Runner:
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-            if self.config.scheduler.name == 'onecycle':
+            if self.config.scheduler.name in ['onecycle', 'cosine']:
                 self.scheduler.step()
 
         self.total_training_samples_count += len(self.train_dl.dataset)

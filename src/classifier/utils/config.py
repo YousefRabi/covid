@@ -73,6 +73,10 @@ def _get_default_config():
     c.transforms.train.HueSaturationValue.hue_limit = 0.2
     c.transforms.train.HueSaturationValue.sat_limit = 0.3
     c.transforms.train.HueSaturationValue.val_limit = 0.2
+    c.transforms.train.CLAHE = edict()
+    c.transforms.train.CLAHE.p = 0
+    c.transforms.train.CLAHE.clip_limit = 3
+    c.transforms.train.CLAHE.tile_grid_size = (8, 8)
     c.transforms.train.Gamma = edict()
     c.transforms.train.Gamma.p = 0
     c.transforms.train.Gamma.limit = (80, 120)
@@ -139,6 +143,10 @@ def _get_default_config():
     c.transforms.test.HueSaturationValue.hue_limit = 0.2
     c.transforms.test.HueSaturationValue.sat_limit = 0.3
     c.transforms.test.HueSaturationValue.val_limit = 0.2
+    c.transforms.test.CLAHE = edict()
+    c.transforms.test.CLAHE.p = 0
+    c.transforms.test.CLAHE.clip_limit = 3
+    c.transforms.test.CLAHE.tile_grid_size = (8, 8)
     c.transforms.test.Gamma = edict()
     c.transforms.test.Gamma.p = 0
     c.transforms.test.Gamma.limit = (80, 120)

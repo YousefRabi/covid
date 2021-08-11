@@ -5,6 +5,7 @@ import datetime
 from classifier.runner import Runner
 from classifier.utils.config import load_config, save_config
 from classifier.utils.logconf import logging
+from classifier.utils.utils import fix_seed
 
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,8 @@ def main():
 
     config = load_config(config_path)
     config_work_dir = Path('trained-models') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
+    
+    fix_seed(config.seed)
 
     log.info(f'Experiment version: {config_path.parent}')
 

@@ -151,6 +151,12 @@ def standard_aug(phase_config):
                                val_shift_limit=phase_config.HueSaturationValue.val_limit,
                                p=phase_config.HueSaturationValue.p))
 
+    if phase_config.CLAHE.p > 0:
+        list_transforms.append(
+            CLAHE(clip_limit=phase_config.CLAHE.clip_limit,
+                  tile_grid_size=phase_config.CLAHE.tile_grid_size,
+                  p=phase_config.CLAHE.p))
+
     if phase_config.Blur:
         list_transforms.append(
             OneOf([
