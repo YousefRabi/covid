@@ -4,6 +4,8 @@ import torch.nn as nn
 import torchvision
 import timm
 
+import numpy as np
+
 
 class ClassificationModel(nn.Module):
     def __init__(self, encoder_name, num_classes, pretrained=True):
@@ -73,3 +75,25 @@ class MultiClsModels:
                 res.append(m(x)[:, -4:])
         res = torch.stack(res)
         return torch.mean(res, dim=0)
+
+
+class MultiClsEnsemble:
+    def __init__(self, models, weights):
+        self.models = models
+        self.weights = weights
+
+    def __call__(self, x):
+        x = x.cuda()
+        with torch.no_grad():
+            for i, fold_models in enumerate(self.models):
+                fold_preds = []
+                for model in fold_models:
+                    logits = model(x)
+                    probabilities = torch.nn.functional.softmax(logits, dim=-1).detach().cpu().numpy()
+                    fold_preds.append(probabilities.tolist())
+                fold_preds = np.mean(fold_preds, axis=0)
+                if i == 0:
+                    ensemble = fold_preds
+                else:
+                    ensemble = self.weights[i] * fold_preds + (1 - self.weights[i]) * ensemble
+        return ensemble
