@@ -40,6 +40,9 @@ class LitModule(LightningModule):
         self.cls_loss_func = loss_builder.get_loss()
         self.seg_loss_func = loss_builder.BCE()
 
+        self.trn_transforms = get_transforms(config.transforms.train)
+        self.val_transforms = get_transforms(config.transforms.test)
+
     def forward(self, x, return_mask):
         return self.model(x, return_mask)
 
@@ -64,5 +67,40 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
+        self.log('train_loss', mean_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
         return mean_loss
 
+    def validation_step(self, batch_tup, batch_idx):
+        input_t, mask_t, label_t, study_id_list = batch_tup
+
+        input_g = input_t.to(self.device, non_blocking=True)
+        mask_g = mask_t.to(self.device, non_blocking=True)
+        label_g = label_t.to(self.device, non_blocking=True)
+
+        logits_g, mask_pred_g = self(input_g, return_mask=True)
+
+        cls_loss_g = self.cls_loss_func(
+            logits_g,
+            label_g,
+        )
+
+        seg_loss_g = self.seg_loss_func(
+            mask_pred_g,
+            mask_g,
+        )
+
+        mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
+
+        self.log('val_loss', mean_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+        return mean_loss
+
+    def configure_optimizers(self):
+        return get_optimizer(self.parameters(), self.config)
+
+    def train_dataloader(self):
+        return get_dataloader(self.config, self.trn_transforms, 'train')
+
+    def val_dataloader(self):
+        return get_dataloader(self.config, self.val_transforms, 'valid')

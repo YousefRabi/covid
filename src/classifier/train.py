@@ -2,10 +2,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 import datetime
 
-from classifier.runner import Runner
+from pytorch_lightning import loggers as pl_loggers
+from pytorch_lightning import Trainer
+
 from classifier.utils.config import load_config, save_config
 from classifier.utils.logconf import logging
-from classifier.utils.utils import fix_seed
+from classifier.runner import LitModule
 
 
 log = logging.getLogger(__name__)
@@ -26,8 +28,6 @@ def main():
 
     config = load_config(config_path)
     config_work_dir = Path('trained-models') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
-    
-    fix_seed(config.seed)
 
     log.info(f'Experiment version: {config_path.parent}')
 
@@ -39,8 +39,13 @@ def main():
 
     log.info(f'Fold: {config.data.idx_fold}/{config.data.num_folds}')
 
-    training_app = Runner(config)
-    training_app.run()
+    tb_logger = pl_loggers.TensorBoardLogger(
+        Path('runs') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
+    )
+
+    trainer = Trainer(precision=16, gpus=2, logger=tb_logger, accelerator='ddp')
+    pl_runner = LitModule(config)
+    trainer.fit(pl_runner)
 
 
 if __name__ == '__main__':

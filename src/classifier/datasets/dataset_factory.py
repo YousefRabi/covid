@@ -61,19 +61,12 @@ def get_dataloader(config, transforms, split):
                                                           folds_df)
 
     if split == 'train':
-        sampler = RandomSampler(dataset)
         batch_size = config.train.batch_size
     else:
-        sampler = SequentialSampler(dataset)
         batch_size = config.test.batch_size
-
-    log.info(f'Sampler: {sampler}')
 
     dataloader = DataLoader(dataset,
                             batch_size=batch_size,
-                            sampler=sampler,
-                            num_workers=config.num_workers,
-                            drop_last=True,
-                            pin_memory=True,)
+                            num_workers=config.num_workers,)
 
     return dataloader
