@@ -43,7 +43,7 @@ def main():
         Path('runs') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
     )
 
-    trainer = Trainer(precision=16, gpus=2, logger=tb_logger, accelerator='ddp')
+    trainer = Trainer(precision=16, gpus=[0], logger=tb_logger, max_epochs=config.train.num_epochs)
     pl_runner = LitModule(config)
     trainer.fit(pl_runner)
 
