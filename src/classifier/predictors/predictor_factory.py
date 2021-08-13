@@ -5,10 +5,13 @@ import pandas as pd
 import numpy as np
 
 import torch
+from pytorch_lightning import Trainer
 
 from classifier.utils.logconf import logging
 from classifier.utils.utils import enumerate_with_estimate
 from classifier.models import get_model
+from classifier.runner import LitModule
+from classifier.trainer import get_trainer
 from classifier.datasets import get_dataloader
 from classifier.losses import LossBuilder
 
@@ -24,43 +27,17 @@ class Predictor:
 
         self.transforms = False
 
-        self.device = self.config.device
-        self.model = self.init_model()
+        self.runner = self.init_runner()
+        self.model = self.runner.model
+        self.model.eval()
+        self.model.float()
+        self.model.cuda()
 
-        loss_builder = LossBuilder(config)
-        self.cls_loss_func = loss_builder.get_loss()
+    def init_runner(self):
+        runner = LitModule(self.config)
+        runner.load_from_checkpoint(self.checkpoint_path, config=self.config)
 
-    def init_model(self):
-        model = get_model(self.config)
-        log.info("Using CUDA; current_device: {}.".format(torch.cuda.current_device()))
-        if self.config.multi_gpu:
-            model = torch.nn.DataParallel(model)
-        model = model.to(self.device)
-        self.load_checkpoint(model, self.checkpoint_path)
-        model.float()
-        model.eval()
-
-        return model
-
-    def load_checkpoint(self, model, checkpoint_path):
-        try:
-            checkpoint = torch.load(checkpoint_path,
-                                    map_location=self.config.device)
-
-            if self.config.multi_gpu:
-                model.module.load_state_dict(checkpoint['model_state_dict'])
-            else:
-                model.load_state_dict(checkpoint['model_state_dict'])
-
-            best_score = checkpoint['best_score']
-
-            print('Loaded model from checkpoint: ', checkpoint_path)
-            print('Best score: ', best_score)
-            print('*' * 50)
-
-        except Exception as e:
-            print('Exception loading checkpoint: ', e)
-            raise
+        return runner
 
     def init_train_dl(self):
         return get_dataloader(self.config, self.transforms, 'train')
@@ -70,7 +47,6 @@ class Predictor:
 
     def run(self):
         val_dl = self.init_val_dl()
-
         val_study_preds = self.do_prediction(val_dl)
 
         all_preds = {**val_study_preds}
@@ -97,15 +73,16 @@ class Predictor:
         return study_preds
 
     def predict(self, batch_tup):
-        input_t, mask_t, label_t, study_id_list = batch_tup
-
-        input_g = input_t.to(self.device, non_blocking=True)
-        label_g = label_t.to(self.device, non_blocking=True)
+        inputs, masks, labels, study_id_list = batch_tup
+        
+        inputs = inputs.cuda()
+        masks = masks.cuda()
+        labels = labels.cuda()
 
         with torch.no_grad():
-            logits = self.model(input_g).detach()
+            logits = self.model(inputs, return_mask=False).detach()
 
-            loss = self.cls_loss_func(logits, label_g).unsqueeze(dim=-1).cpu().detach().numpy()
+            loss = self.runner.cls_loss_func(logits, labels).unsqueeze(dim=-1).cpu().detach().numpy()
 
             probability_arr = torch.nn.functional.softmax(logits, dim=-1).cpu().detach().numpy()
             preds_arr = np.hstack([probability_arr, loss])
@@ -113,9 +90,6 @@ class Predictor:
         batch_preds_dict = dict(zip(study_id_list, preds_arr))
 
         return batch_preds_dict
-
-    def softmax(logits):
-        return torch.nn.functional.softmax(logits, dim=-1).detach()
 
     def organize_preds_into_df(self, preds_dict):
         preds_list = []
