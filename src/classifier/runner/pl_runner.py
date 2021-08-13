@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 from pytorch_lightning.core.lightning import LightningModule
 from torchmetrics import AveragePrecision
@@ -30,10 +32,12 @@ class LitModule(LightningModule):
         return self.model(x, return_mask)
 
     def training_step(self, batch_tup, batch_idx):
+        training_step_outputs = {}
+
         inputs, masks, labels, study_id_list = batch_tup
 
         logits, mask_preds = self(inputs, return_mask=True)
-        probabilities = torch.nn.functional.softmax(logits, dim=-1).detach().cpu()
+        probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
 
         cls_loss_g = self.cls_loss_func(
             logits,
@@ -47,19 +51,45 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        average_precision = self.average_precision(probabilities, labels)
+        self.log('train_loss', mean_loss, on_step=True, on_epoch=True, logger=True, sync_dist=True)
 
-        self.log('train_loss', mean_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-        self.log(
-            'train_ap', average_precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        training_step_outputs['loss'] = mean_loss
+        training_step_outputs['probabilities'] = probabilities
+        training_step_outputs['labels'] = labels
 
-        return mean_loss
+        return training_step_outputs
+
+    def training_epoch_end(self, training_step_outputs):
+        probabilities = torch.cat(
+            [training_step_output['probabilities'] for training_step_output in training_step_outputs])
+        labels = torch.cat([training_step_output['labels'] for training_step_output in training_step_outputs])
+        average_precisions = self.average_precision(probabilities, labels)
+        negative, typical, indeterminate, atypical = average_precisions
+
+        mean_average_precision = torch.mean(torch.stack(average_precisions))
+
+        for cls, value in zip(['negative', 'typical', 'indeterminate', 'atypical'], average_precisions):
+            self.log(f'train_{cls}',
+                     value,
+                     on_step=False,
+                     on_epoch=True,
+                     logger=True,
+                     sync_dist=True)
+
+        self.log('train_ap',
+                 mean_average_precision,
+                 on_step=False,
+                 on_epoch=True,
+                 logger=True,
+                 sync_dist=True)
 
     def validation_step(self, batch_tup, batch_idx):
+        validation_step_outputs = {}
+
         inputs, masks, labels, study_id_list = batch_tup
 
         logits, mask_preds = self(inputs, return_mask=True)
-        probabilities = torch.nn.functional.softmax(logits, dim=-1).detach().cpu()
+        probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
 
         cls_loss_g = self.cls_loss_func(
             logits,
@@ -73,13 +103,38 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        average_precision = self.average_precision(probabilities, labels)
+        self.log('val_loss', mean_loss, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
 
-        self.log('val_loss', mean_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-        self.log(
-            'val_ap', average_precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        validation_step_outputs['loss'] = mean_loss
+        validation_step_outputs['probabilities'] = probabilities
+        validation_step_outputs['labels'] = labels
 
-        return mean_loss
+        return validation_step_outputs
+
+    def validation_epoch_end(self, validation_step_outputs):
+        probabilities = torch.cat(
+            [validation_step_output['probabilities'] for validation_step_output in validation_step_outputs])
+        labels = torch.cat([validation_step_output['labels'] for validation_step_output in validation_step_outputs])
+        average_precisions = self.average_precision(probabilities, labels)
+        negative, typical, indeterminate, atypical = average_precisions
+
+        mean_average_precision = torch.mean(torch.stack(average_precisions))
+
+        for cls, value in zip(['negative', 'typical', 'indeterminate', 'atypical'], average_precisions):
+            self.log(f'val_{cls}',
+                     value,
+                     on_step=False,
+                     on_epoch=True,
+                     logger=True,
+                     sync_dist=True)
+
+        self.log('val_ap',
+                 mean_average_precision,
+                 on_step=False,
+                 on_epoch=True,
+                 prog_bar=False,
+                 logger=True,
+                 sync_dist=True)
 
     def configure_optimizers(self):
         return get_optimizer(self.parameters(), self.config)
