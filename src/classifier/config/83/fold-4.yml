@@ -70,6 +70,9 @@ scheduler:
   params:
     min_lr: 0
 
+callbacks:
+  monitor: 'val_ap'
+ 
 num_workers: 8
 device: 'cuda:0'
 multi_gpu: False

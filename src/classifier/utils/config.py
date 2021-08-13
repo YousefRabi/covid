@@ -208,8 +208,13 @@ def _get_default_config():
     c.scheduler.warmup.multiplier = 1
     c.scheduler.warmup.epochs = 1
 
+    c.callbacks = edict()
+    c.callbacks.checkpoint = edict()
+    c.callbacks.checkpoint.apply = True
+    c.callbacks.checkpoint.monitor = 'val_loss'
+
     c.device = 'cuda:0'
-    c.multi_gpus = False
+    c.gpus = [0]
     c.num_workers = 2
     c.work_dir = './work_dir'
     c.experiment_version = 0

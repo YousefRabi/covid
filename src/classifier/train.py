@@ -8,6 +8,7 @@ from pytorch_lightning import Trainer
 from classifier.utils.config import load_config, save_config
 from classifier.utils.logconf import logging
 from classifier.runner import LitModule
+from classifier.trainer import get_trainer
 
 
 log = logging.getLogger(__name__)
@@ -39,11 +40,7 @@ def main():
 
     log.info(f'Fold: {config.data.idx_fold}/{config.data.num_folds}')
 
-    tb_logger = pl_loggers.TensorBoardLogger(
-        Path('runs') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
-    )
-
-    trainer = Trainer(precision=16, gpus=[0], logger=tb_logger, max_epochs=config.train.num_epochs)
+    trainer = get_trainer(config)
     pl_runner = LitModule(config)
     trainer.fit(pl_runner)
 

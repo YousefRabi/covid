@@ -70,8 +70,12 @@ scheduler:
   params:
     min_lr: 0
 
+callbacks:
+  monitor: 'val_ap'callbacks:
+    monitor: 'val_ap'
+
 num_workers: 8
 device: 'cuda:0'
-multi_gpu: False
+gpus: [0]
 debug: False
 work_dir: 'build/'
