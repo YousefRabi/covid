@@ -71,8 +71,7 @@ scheduler:
     min_lr: 0
 
 callbacks:
-  monitor: 'val_ap'callbacks:
-    monitor: 'val_ap'
+  monitor: 'val_ap'
 
 num_workers: 8
 device: 'cuda:0'
