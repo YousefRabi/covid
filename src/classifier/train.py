@@ -28,7 +28,7 @@ def main():
     config_path = Path(args.config)
 
     config = load_config(config_path)
-    config_work_dir = Path('trained-models') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
+    config_work_dir = Path('runs') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
 
     log.info(f'Experiment version: {config_path.parent}')
 
