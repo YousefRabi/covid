@@ -143,7 +143,13 @@ class LitModule(LightningModule):
         scheduler_builder = SchedulerBuilder(self.optimizer, self.config, dataset_length)
         scheduler = scheduler_builder.get_scheduler()
 
-        return [optimizer], [scheduler]
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': scheduler,
+                'interval': 'step'
+            }
+        }
 
     def train_dataloader(self):
         return get_dataloader(self.config, self.trn_transforms, 'train')
