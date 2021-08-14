@@ -8,7 +8,8 @@ from torchmetrics import AveragePrecision
 from classifier.models import get_model
 from classifier.optimizers import get_optimizer
 from classifier.datasets import get_dataloader
-from classifier.transforms import get_transforms, get_first_place_melanoma_transforms, Mixup
+from classifier.transforms import get_transforms
+from classifier.schedulers import SchedulerBuilder, get_scheduler
 from classifier.losses import LossBuilder
 
 
@@ -137,7 +138,18 @@ class LitModule(LightningModule):
                  sync_dist=True)
 
     def configure_optimizers(self):
-        return get_optimizer(self.parameters(), self.config)
+        optimizer = get_optimizer(self.parameters(), self.config)
+        dataset_length = len(self.train_dataloader.dataset)
+        scheduler_builder = SchedulerBuilder(self.optimizer, self.config, dataset_length)
+        scheduler = scheduler_builder.get_scheduler()
+
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': scheduler,
+                'interval': 'step'
+            }
+        }
 
     def train_dataloader(self):
         return get_dataloader(self.config, self.trn_transforms, 'train')
