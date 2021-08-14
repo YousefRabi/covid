@@ -31,7 +31,7 @@ def main():
     config_paths = sorted(list(args.configs))
 
     config = load_config(config_paths[0])
-    file_handler = logging.FileHandler(Path(config.work_dir).parent / 'predict.log')
+    file_handler = logging.FileHandler(Path(config.work_dir) / 'predict.log')
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)
 
