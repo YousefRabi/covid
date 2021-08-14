@@ -9,7 +9,7 @@ from classifier.models import get_model
 from classifier.optimizers import get_optimizer
 from classifier.datasets import get_dataloader
 from classifier.transforms import get_transforms
-from classifier.schedulers import SchedulerBuilder, get_scheduler
+from classifier.schedulers import SchedulerBuilder
 from classifier.losses import LossBuilder
 
 
