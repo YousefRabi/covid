@@ -139,8 +139,8 @@ class LitModule(LightningModule):
 
     def configure_optimizers(self):
         optimizer = get_optimizer(self.parameters(), self.config)
-        dataset_length = len(self.train_dataloader.dataset)
-        scheduler_builder = SchedulerBuilder(self.optimizer, self.config, dataset_length)
+        dataset_length = len(self.train_dataloader().dataset)
+        scheduler_builder = SchedulerBuilder(optimizer, self.config, dataset_length)
         scheduler = scheduler_builder.get_scheduler()
 
         return {
