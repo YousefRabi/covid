@@ -74,7 +74,7 @@ class Predictor:
 
     def predict(self, batch_tup):
         inputs, masks, labels, study_id_list = batch_tup
-        
+
         inputs = inputs.cuda()
         masks = masks.cuda()
         labels = labels.cuda()

@@ -72,7 +72,7 @@ scheduler:
 
 callbacks:
   checkpoint:
-      monitor: 'map/val'
+      monitor: 'map/val_epoch'
 
 num_workers: 8
 device: 'cuda:0'
