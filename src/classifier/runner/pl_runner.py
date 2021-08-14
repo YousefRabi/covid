@@ -29,6 +29,8 @@ class LitModule(LightningModule):
 
         self.average_precision = AveragePrecision(num_classes=4)
 
+        self.sync_dist = len(config.gpus) > 1
+
     def forward(self, x, return_mask=False):
         return self.model(x, return_mask)
 
@@ -52,7 +54,7 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        self.log('loss/train', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log('loss/train', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
 
         training_step_outputs['loss'] = mean_loss
         training_step_outputs['probabilities'] = probabilities
@@ -75,7 +77,7 @@ class LitModule(LightningModule):
                      on_step=False,
                      on_epoch=True,
                      logger=True,
-                     sync_dist=True)
+                     sync_dist=self.sync_dist)
 
         self.log('map/train',
                  mean_average_precision,
@@ -83,7 +85,7 @@ class LitModule(LightningModule):
                  on_epoch=True,
                  prog_bar=True,
                  logger=True,
-                 sync_dist=True)
+                 sync_dist=self.sync_dist)
 
     def validation_step(self, batch_tup, batch_idx):
         validation_step_outputs = {}
@@ -105,7 +107,7 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        self.log('loss/val', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log('loss/val', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
 
         validation_step_outputs['loss'] = mean_loss
         validation_step_outputs['probabilities'] = probabilities
@@ -128,7 +130,7 @@ class LitModule(LightningModule):
                      on_step=False,
                      on_epoch=True,
                      logger=True,
-                     sync_dist=True)
+                     sync_dist=self.sync_dist)
 
         self.log('map/val',
                  mean_average_precision,
@@ -136,7 +138,7 @@ class LitModule(LightningModule):
                  on_epoch=True,
                  prog_bar=True,
                  logger=True,
-                 sync_dist=True)
+                 sync_dist=self.sync_dist)
 
     def configure_optimizers(self):
         optimizer = get_optimizer(self.parameters(), self.config)
