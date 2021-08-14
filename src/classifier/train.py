@@ -42,6 +42,9 @@ def main():
 
     trainer = get_trainer(config)
     pl_runner = LitModule(config)
+
+    log.info(f'callbacks: {trainer.callbacks}')
+
     trainer.fit(pl_runner)
 
 

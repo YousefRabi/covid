@@ -52,7 +52,7 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        self.log('loss/train', mean_loss, on_step=True, on_epoch=True, logger=True, sync_dist=True)
+        self.log('loss/train', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 
         training_step_outputs['loss'] = mean_loss
         training_step_outputs['probabilities'] = probabilities
@@ -81,6 +81,7 @@ class LitModule(LightningModule):
                  mean_average_precision,
                  on_step=False,
                  on_epoch=True,
+                 prog_bar=True,
                  logger=True,
                  sync_dist=True)
 
@@ -104,7 +105,7 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        self.log('loss/val', mean_loss, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
+        self.log('loss/val', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 
         validation_step_outputs['loss'] = mean_loss
         validation_step_outputs['probabilities'] = probabilities
@@ -133,7 +134,7 @@ class LitModule(LightningModule):
                  mean_average_precision,
                  on_step=False,
                  on_epoch=True,
-                 prog_bar=False,
+                 prog_bar=True,
                  logger=True,
                  sync_dist=True)
 
