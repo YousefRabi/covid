@@ -8,8 +8,8 @@ def get_callbacks(config):
 
     if config.callbacks.checkpoint.apply:
         checkpoint_callback = ModelCheckpoint(dirpath=Path(config.work_dir) / 'checkpoints',
-                                              monitor=config.callbacks.checkpoint.monitor,
-                                              filename='best_model')
+                                              filename='best_model',
+                                              **config.callbacks.checkpoint.params)
         callbacks.append(checkpoint_callback)
 
     return callbacks

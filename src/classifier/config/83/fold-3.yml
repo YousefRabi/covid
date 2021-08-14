@@ -72,7 +72,9 @@ scheduler:
 
 callbacks:
   checkpoint:
-      monitor: 'map/val'
+      params:
+          monitor: 'map/val'
+          mode: 'max'
 
 num_workers: 8
 device: 'cuda:0'
