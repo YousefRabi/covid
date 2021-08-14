@@ -51,7 +51,7 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        self.log('train_loss', mean_loss, on_step=True, on_epoch=True, logger=True, sync_dist=True)
+        self.log('loss/train', mean_loss, on_step=True, on_epoch=True, logger=True, sync_dist=True)
 
         training_step_outputs['loss'] = mean_loss
         training_step_outputs['probabilities'] = probabilities
@@ -69,14 +69,14 @@ class LitModule(LightningModule):
         mean_average_precision = torch.mean(torch.stack(average_precisions))
 
         for cls, value in zip(['negative', 'typical', 'indeterminate', 'atypical'], average_precisions):
-            self.log(f'train_{cls}',
+            self.log(f'map/train_{cls}',
                      value,
                      on_step=False,
                      on_epoch=True,
                      logger=True,
                      sync_dist=True)
 
-        self.log('train_ap',
+        self.log('map/train',
                  mean_average_precision,
                  on_step=False,
                  on_epoch=True,
@@ -103,7 +103,7 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        self.log('val_loss', mean_loss, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
+        self.log('loss/val', mean_loss, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
 
         validation_step_outputs['loss'] = mean_loss
         validation_step_outputs['probabilities'] = probabilities
@@ -121,14 +121,14 @@ class LitModule(LightningModule):
         mean_average_precision = torch.mean(torch.stack(average_precisions))
 
         for cls, value in zip(['negative', 'typical', 'indeterminate', 'atypical'], average_precisions):
-            self.log(f'val_{cls}',
+            self.log(f'map/val_{cls}',
                      value,
                      on_step=False,
                      on_epoch=True,
                      logger=True,
                      sync_dist=True)
 
-        self.log('val_ap',
+        self.log('map/val',
                  mean_average_precision,
                  on_step=False,
                  on_epoch=True,
