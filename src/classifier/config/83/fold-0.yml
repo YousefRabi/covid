@@ -77,7 +77,4 @@ callbacks:
           mode: 'max'
 
 num_workers: 8
-device: 'cuda:0'
 gpus: [1]
-debug: False
-work_dir: 'build/'
