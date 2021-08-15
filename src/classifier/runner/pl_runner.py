@@ -54,7 +54,8 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        self.log('loss/train', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
+        self.log(
+            'loss/train', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
 
         training_step_outputs['loss'] = mean_loss
         training_step_outputs['probabilities'] = probabilities
@@ -107,7 +108,8 @@ class LitModule(LightningModule):
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
 
-        self.log('loss/val', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
+        self.log(
+            'loss/val', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
 
         validation_step_outputs['loss'] = mean_loss
         validation_step_outputs['probabilities'] = probabilities
@@ -122,7 +124,7 @@ class LitModule(LightningModule):
         average_precisions = self.average_precision(probabilities, labels)
         negative, typical, indeterminate, atypical = average_precisions
 
-        mean_average_precision = torch.mean(torch.stack(average_precisions))
+        mean_average_precision = torch.stack(average_precisions).mean()
 
         for cls, value in zip(['negative', 'typical', 'indeterminate', 'atypical'], average_precisions):
             self.log(f'map/val_{cls}',
@@ -132,13 +134,15 @@ class LitModule(LightningModule):
                      logger=True,
                      sync_dist=self.sync_dist)
 
-        self.log('map/val',
+        self.log('val_map',
                  mean_average_precision,
                  on_step=False,
                  on_epoch=True,
                  prog_bar=True,
                  logger=True,
                  sync_dist=self.sync_dist)
+
+        torch.save(self.model.state_dict(), 'runs/83/test_model_dict.pth')
 
     def configure_optimizers(self):
         optimizer = get_optimizer(self.parameters(), self.config)

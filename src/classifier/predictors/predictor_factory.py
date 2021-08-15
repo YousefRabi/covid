@@ -1,5 +1,5 @@
 from easydict import EasyDict
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 import pandas as pd
 import numpy as np
@@ -29,6 +29,9 @@ class Predictor:
 
         self.runner = self.init_runner()
         self.model = self.runner.model
+        state_dict = torch.load(self.checkpoint_path)['state_dict']
+        state_dict = OrderedDict([(k.replace('model.', ''), v) for k, v in state_dict.items()])
+        self.model.load_state_dict(state_dict)
         self.model.eval()
         self.model.float()
         self.model.cuda()
@@ -80,7 +83,7 @@ class Predictor:
         labels = labels.cuda()
 
         with torch.no_grad():
-            logits = self.model(inputs, return_mask=False).detach()
+            logits = self.model(inputs).detach()
 
             loss = self.runner.cls_loss_func(logits, labels).unsqueeze(dim=-1).cpu().detach().numpy()
 

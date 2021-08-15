@@ -8,8 +8,10 @@ def get_callbacks(config):
 
     if config.callbacks.checkpoint.apply:
         checkpoint_callback = ModelCheckpoint(dirpath=Path(config.work_dir) / 'checkpoints',
-                                              filename='epoch{epoch:02d}-val_map{val/map:.2f}',
-                                              **config.callbacks.checkpoint.params)
+                                              filename='{epoch:02d}-{val_map:.2f}',
+                                              monitor='val_map',
+                                              verbose=True,
+                                              mode='max')
         callbacks.append(checkpoint_callback)
 
     return callbacks
