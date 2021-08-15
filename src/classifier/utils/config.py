@@ -214,6 +214,7 @@ def _get_default_config():
     c.callbacks.checkpoint.params = edict()
     c.callbacks.checkpoint.params.monitor = 'val_loss'
     c.callbacks.checkpoint.params.mode = 'min'
+    c.callbacks.checkpoint.params.verbose = True
 
     c.device = 'cuda:0'
     c.gpus = [0]
