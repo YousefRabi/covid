@@ -201,8 +201,8 @@ def _get_default_config():
 
     c.scheduler = edict()
     c.scheduler.name = 'plateau'
-    c.scheduler.type = 'epoch'
     c.scheduler.params = edict()
+    c.scheduler.params.interval = 'epoch'
     c.scheduler.warmup = edict()
     c.scheduler.warmup.apply = False
     c.scheduler.warmup.multiplier = 1

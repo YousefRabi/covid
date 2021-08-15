@@ -154,7 +154,7 @@ class LitModule(LightningModule):
             'optimizer': optimizer,
             'lr_scheduler': {
                 'scheduler': scheduler,
-                'interval': 'step'
+                'interval': self.config.scheduler.params.interval
             }
         }
 
