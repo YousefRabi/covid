@@ -4,6 +4,7 @@ import datetime
 
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning import Trainer
+from pytorch_lightning.utilities import seed_everything
 
 from classifier.utils.config import load_config, save_config
 from classifier.utils.logconf import logging
@@ -31,6 +32,8 @@ def main():
     config_work_dir = Path('runs') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
 
     log.info(f'Experiment version: {config_path.parent}')
+
+    seed_everything(config.seed)
 
     config.work_dir = config_work_dir
     config.experiment_version = config_path.parent.stem
