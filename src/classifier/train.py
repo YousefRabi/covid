@@ -4,7 +4,7 @@ import datetime
 
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning import Trainer
-from pytorch_lightning.utilities import seed_everything
+from pytorch_lightning.utilities.seed import seed_everything
 
 from classifier.utils.config import load_config, save_config
 from classifier.utils.logconf import logging
