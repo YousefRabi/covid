@@ -209,12 +209,15 @@ def _get_default_config():
     c.scheduler.warmup.epochs = 1
 
     c.callbacks = edict()
+
     c.callbacks.checkpoint = edict()
     c.callbacks.checkpoint.apply = True
     c.callbacks.checkpoint.params = edict()
     c.callbacks.checkpoint.params.monitor = 'val_loss'
     c.callbacks.checkpoint.params.mode = 'min'
     c.callbacks.checkpoint.params.verbose = True
+
+    c.callbacks.lr_monitor = True
 
     c.device = 'cuda:0'
     c.gpus = [0]
