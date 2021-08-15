@@ -74,7 +74,7 @@ scheduler:
 callbacks:
   checkpoint:
       params:
-          monitor: 'val_map'
+          monitor: 'map/val'
           mode: 'max'
 
 num_workers: 8

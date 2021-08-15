@@ -8,7 +8,7 @@ def get_callbacks(config):
 
     if config.callbacks.checkpoint.apply:
         checkpoint_cb = ModelCheckpoint(dirpath=Path(config.work_dir) / 'checkpoints',
-                                        filename='{epoch:02d}-{val_map:.2f}',
+                                        filename='{epoch:02d}-map{map/val:.2f}',
                                         **config.callbacks.checkpoint.params)
         callbacks.append(checkpoint_cb)
 

@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import numpy as np
 
 import torch
@@ -40,7 +42,7 @@ class LitModule(LightningModule):
         inputs, masks, labels, study_id_list = batch_tup
 
         logits, mask_preds = self(inputs, return_mask=True)
-        probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
+        probabilities = torch.nn.functional.softmax(logits, dim=-1).detach().cpu().numpy()
 
         cls_loss_g = self.cls_loss_func(
             logits,
@@ -57,6 +59,7 @@ class LitModule(LightningModule):
         self.log(
             'loss/train', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
 
+        training_step_outputs['study_ids'] = study_id_list
         training_step_outputs['loss'] = mean_loss
         training_step_outputs['probabilities'] = probabilities
         training_step_outputs['labels'] = labels
@@ -64,10 +67,28 @@ class LitModule(LightningModule):
         return training_step_outputs
 
     def training_epoch_end(self, training_step_outputs):
-        probabilities = torch.cat(
-            [training_step_output['probabilities'] for training_step_output in training_step_outputs])
-        labels = torch.cat([training_step_output['labels'] for training_step_output in training_step_outputs])
-        average_precisions = self.average_precision(probabilities, labels)
+        study_id_preds = defaultdict(list)
+        study_id_labels = dict()
+
+        for training_step_output in training_step_outputs:
+            for study_id, probabilities, label in zip(
+                training_step_output['study_ids'],
+                training_step_output['probabilities'],
+                training_step_output['labels']
+            ):
+                study_id_preds[study_id].append(probabilities)
+                study_id_labels[study_id] = label
+
+        labels = []
+        mean_preds = []
+
+        for study_id, study_preds in study_id_preds.items():
+            labels.append(study_id_labels[study_id])
+            mean_preds.append(torch.from_numpy(np.mean(study_preds, axis=0)))
+
+        mean_preds = torch.stack(mean_preds)
+        labels = torch.tensor(labels)
+        average_precisions = self.average_precision(mean_preds, labels)
         negative, typical, indeterminate, atypical = average_precisions
 
         mean_average_precision = torch.mean(torch.stack(average_precisions))
@@ -94,7 +115,7 @@ class LitModule(LightningModule):
         inputs, masks, labels, study_id_list = batch_tup
 
         logits, mask_preds = self(inputs, return_mask=True)
-        probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
+        probabilities = torch.nn.functional.softmax(logits, dim=-1).detach().cpu().numpy()
 
         cls_loss_g = self.cls_loss_func(
             logits,
@@ -111,6 +132,7 @@ class LitModule(LightningModule):
         self.log(
             'loss/val', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
 
+        validation_step_outputs['study_ids'] = study_id_list
         validation_step_outputs['loss'] = mean_loss
         validation_step_outputs['probabilities'] = probabilities
         validation_step_outputs['labels'] = labels
@@ -118,13 +140,31 @@ class LitModule(LightningModule):
         return validation_step_outputs
 
     def validation_epoch_end(self, validation_step_outputs):
-        probabilities = torch.cat(
-            [validation_step_output['probabilities'] for validation_step_output in validation_step_outputs])
-        labels = torch.cat([validation_step_output['labels'] for validation_step_output in validation_step_outputs])
-        average_precisions = self.average_precision(probabilities, labels)
+        study_id_preds = defaultdict(list)
+        study_id_labels = dict()
+
+        for validation_step_output in validation_step_outputs:
+            for study_id, probabilities, label in zip(
+                validation_step_output['study_ids'],
+                validation_step_output['probabilities'],
+                validation_step_output['labels']
+            ):
+                study_id_preds[study_id].append(probabilities)
+                study_id_labels[study_id] = label
+
+        labels = []
+        mean_preds = []
+
+        for study_id, study_preds in study_id_preds.items():
+            labels.append(study_id_labels[study_id])
+            mean_preds.append(torch.from_numpy(np.mean(study_preds, axis=0)))
+
+        mean_preds = torch.stack(mean_preds)
+        labels = torch.tensor(labels)
+        average_precisions = self.average_precision(mean_preds, labels)
         negative, typical, indeterminate, atypical = average_precisions
 
-        mean_average_precision = torch.stack(average_precisions).mean()
+        mean_average_precision = torch.mean(torch.stack(average_precisions))
 
         for cls, value in zip(['negative', 'typical', 'indeterminate', 'atypical'], average_precisions):
             self.log(f'map/val_{cls}',
@@ -134,7 +174,7 @@ class LitModule(LightningModule):
                      logger=True,
                      sync_dist=self.sync_dist)
 
-        self.log('val_map',
+        self.log('map/val',
                  mean_average_precision,
                  on_step=False,
                  on_epoch=True,
