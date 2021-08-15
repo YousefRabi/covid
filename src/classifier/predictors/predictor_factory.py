@@ -29,16 +29,14 @@ class Predictor:
 
         self.runner = self.init_runner()
         self.model = self.runner.model
-        state_dict = torch.load(self.checkpoint_path)['state_dict']
-        state_dict = OrderedDict([(k.replace('model.', ''), v) for k, v in state_dict.items()])
-        self.model.load_state_dict(state_dict)
         self.model.eval()
         self.model.float()
         self.model.cuda()
 
     def init_runner(self):
         runner = LitModule(self.config)
-        runner.load_from_checkpoint(self.checkpoint_path, config=self.config)
+        ckpt = torch.load(self.checkpoint_path)
+        runner.load_state_dict(ckpt['state_dict'])
 
         return runner
 
