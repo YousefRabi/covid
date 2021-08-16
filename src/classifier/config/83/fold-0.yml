@@ -18,7 +18,7 @@ model:
 train:
   batch_size: 16 
   overfit_single_batch: False
-  num_epochs: 3
+  num_epochs: 10
   snapshots: 1
 
 test:
@@ -78,4 +78,4 @@ callbacks:
           mode: 'max'
 
 num_workers: 8
-gpus: [0]
+gpus: [1]
