@@ -13,7 +13,7 @@ def get_callbacks(config):
         callbacks.append(checkpoint_cb)
 
     if config.callbacks.lr_monitor:
-        lr_monitor_cb = LearningRateMonitor(logging_interval='epoch')
+        lr_monitor_cb = LearningRateMonitor(logging_interval='step')
         callbacks.append(lr_monitor_cb)
 
     return callbacks

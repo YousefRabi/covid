@@ -18,6 +18,7 @@ from classifier.losses import LossBuilder
 class LitModule(LightningModule):
     def __init__(self, config):
         super().__init__()
+        self.automatic_optimization = False
 
         self.config = config
         self.model = get_model(config)
@@ -39,6 +40,10 @@ class LitModule(LightningModule):
     def training_step(self, batch_tup, batch_idx):
         training_step_outputs = {}
 
+        optimizer = self.optimizers()
+        scheduler = self.lr_schedulers()
+        optimizer.zero_grad()
+
         inputs, masks, labels, study_id_list = batch_tup
 
         logits, mask_preds = self(inputs, return_mask=True)
@@ -55,6 +60,10 @@ class LitModule(LightningModule):
         )
 
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
+
+        self.manual_backward(mean_loss)
+        optimizer.step()
+        scheduler.step()
 
         self.log(
             'loss/train', mean_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=self.sync_dist)
@@ -194,7 +203,6 @@ class LitModule(LightningModule):
             'optimizer': optimizer,
             'lr_scheduler': {
                 'scheduler': scheduler,
-                'interval': self.config.scheduler.params.interval
             }
         }
 
