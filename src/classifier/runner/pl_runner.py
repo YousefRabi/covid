@@ -183,7 +183,7 @@ class LitModule(LightningModule):
                      logger=True,
                      sync_dist=self.sync_dist)
 
-        self.log('map/val',
+        self.log('val_map',
                  mean_average_precision,
                  on_step=False,
                  on_epoch=True,
