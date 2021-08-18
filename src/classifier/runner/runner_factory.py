@@ -60,11 +60,12 @@ class Runner:
         self.best_loss = float('inf')
         self.total_training_samples_count = 0
 
-        self.ddp = (os.environ['CUDA_VISIBLE_DEVICES']) > 1
+        self.device = torch.device('cuda')
+
+        self.ddp = len(os.environ['CUDA_VISIBLE_DEVICES']) > 1
         if self.ddp:
             assert self.rank is not None, 'rank is None when DDP is True'
-
-        self.device = torch.device('cuda')
+            self.device = self.rank
 
         self.trn_transforms = get_transforms(config.transforms.train)
         log.info(f'train transforms: {self.trn_transforms}')
@@ -103,12 +104,10 @@ class Runner:
     def init_model(self):
         model = get_model(self.config)
         log.info("Using CUDA; current_device: {}.".format(torch.cuda.current_device()))
+        model = model.to(self.device)
         if self.ddp:
-            model = model.to(self.rank)
-            model = DDP(model, device_ids=[self.rank])
+            model = DDP(model, device_ids=[self.device])
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        else:
-            model = model.to(self.device)
 
         return model
 

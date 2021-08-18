@@ -55,7 +55,7 @@ def main(config_path, rank=None):
 
     log.info(f'Fold: {config.data.idx_fold}/{config.data.num_folds}')
 
-    training_app = Runner(config, args.local_rank)
+    training_app = Runner(config, rank)
     training_app.run()
 
 
@@ -67,9 +67,9 @@ if __name__ == '__main__':
     if num_cuda_devices > 1:
         world_size = num_cuda_devices
         torch.multiprocessing.spawn(init_process,
-                                    args=(args.rank, world_size, args.config_path),
+                                    args=(args.rank, world_size, args.config),
                                     nproces=world_size,
                                     join=True)
 
     else:
-        main(args.config_path)
+        main(args.config)
