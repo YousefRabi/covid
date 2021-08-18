@@ -13,6 +13,7 @@ import seaborn as sns
 
 import torch
 from torch.cuda.amp import autocast
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
 from map_boxes import mean_average_precision_for_boxes
@@ -44,7 +45,8 @@ id2label = {0: 'negative', 1: 'typical', 2: 'indeterminate', 3: 'atypical'}
 
 class Runner:
 
-    def __init__(self, config: EasyDict):
+    def __init__(self, config: EasyDict, rank=None):
+        self.rank = rank
         self.config = config
 
         self.log_to_experiment_folder()
@@ -57,6 +59,10 @@ class Runner:
         self.best_score = 0.0
         self.best_loss = float('inf')
         self.total_training_samples_count = 0
+
+        self.ddp = (os.environ['CUDA_VISIBLE_DEVICES']) > 1
+        if self.ddp:
+            assert self.rank is not None, 'rank is None when DDP is True'
 
         self.device = torch.device('cuda')
 
@@ -97,9 +103,12 @@ class Runner:
     def init_model(self):
         model = get_model(self.config)
         log.info("Using CUDA; current_device: {}.".format(torch.cuda.current_device()))
-        if self.config.multi_gpu:
-            model = torch.nn.DataParallel(model)
-        model = model.to(self.device)
+        if self.ddp:
+            model = model.to(self.rank)
+            model = DDP(model, device_ids=[self.rank])
+            model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        else:
+            model = model.to(self.device)
 
         return model
 
