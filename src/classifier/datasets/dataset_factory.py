@@ -67,7 +67,8 @@ def get_dataloader(config, transforms, split):
         sampler = SequentialSampler(dataset)
         batch_size = config.test.batch_size
 
-    log.info(f'Sampler: {sampler}')
+    if config.rank == 0:
+        log.info(f'Sampler: {sampler}')
 
     dataloader = DataLoader(dataset,
                             batch_size=batch_size,

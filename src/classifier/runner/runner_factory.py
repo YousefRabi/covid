@@ -45,8 +45,8 @@ id2label = {0: 'negative', 1: 'typical', 2: 'indeterminate', 3: 'atypical'}
 
 class Runner:
 
-    def __init__(self, config: EasyDict, rank=None):
-        self.rank = rank
+    def __init__(self, config: EasyDict):
+        self.rank = config.rank
         self.config = config
 
         self.log_to_experiment_folder()
@@ -66,9 +66,11 @@ class Runner:
         if self.ddp:
             assert self.rank is not None, 'rank is None when DDP is True'
             self.device = self.rank
+        else:
+            self.rank = 0
 
         self.trn_transforms = get_transforms(config.transforms.train)
-        log.info(f'train transforms: {self.trn_transforms}')
+        self._log(f'train transforms: {self.trn_transforms}')
         self.val_transforms = get_transforms(config.transforms.test)
         self.mixup_fn = Mixup(**config.mixup) if config.mixup.prob > 0 else None
 
@@ -101,13 +103,17 @@ class Runner:
         file_handler.setLevel(logging.INFO)
         log.addHandler(file_handler)
 
+    def _log(self, message):
+        if self.rank == 0:
+            log.info(message)
+
     def init_model(self):
         model = get_model(self.config)
-        log.info("Using CUDA; current_device: {}.".format(torch.cuda.current_device()))
+        self._log("Using CUDA; current_device: {}.".format(torch.cuda.current_device()))
         model = model.to(self.device)
         if self.ddp:
-            model = DDP(model, device_ids=[self.device])
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            model = DDP(model, device_ids=[self.device])
 
         return model
 
@@ -144,7 +150,7 @@ class Runner:
         return get_dataloader(self.config, self.val_transforms, 'valid')
 
     def init_tensorboard_writers(self):
-        if self.trn_writer is None:
+        if self.trn_writer is None and self.rank == 0:
             log_dir = os.path.join(
                 'runs',
                 self.config.experiment_version,
@@ -158,7 +164,7 @@ class Runner:
                 log_dir=log_dir + '-val')
 
     def run(self):
-        log.info("Starting {}, {}".format(type(self).__name__, self.config))
+        self._log("Starting {}, {}".format(type(self).__name__, self.config))
 
         score = 0.0
 
@@ -167,7 +173,7 @@ class Runner:
             self.optimizer.step()
 
         for epoch_ndx in range(1, self.config.train.num_epochs + 1):
-            log.info("Epoch {} of {}, {}/{} batches of size {}".format(
+            self._log("Epoch {} of {}, {}/{} batches of size {}".format(
                 epoch_ndx,
                 self.config.train.num_epochs,
                 len(self.train_dl),
@@ -183,7 +189,7 @@ class Runner:
                 score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr, confusion_matrix_dict)
 
                 if score > self.best_score:
-                    log.info(f'mAP improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
+                    self._log(f'mAP improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
                     save_model_with_optimizer(self.model,
                                               self.optimizer,
                                               self.scheduler,
@@ -199,7 +205,7 @@ class Runner:
                                   self.config.multi_gpu,
                                   self.config.work_dir / 'checkpoints' / 'latest_model.pth')
 
-        log.info(f'Best mAP: {self.best_score}')
+        self._log(f'Best mAP: {self.best_score}')
         self.trn_writer.close()
         self.val_writer.close()
 
@@ -226,10 +232,11 @@ class Runner:
         preds_dict = defaultdict(list)
         confusion_matrix_dict = {'labels': [], 'preds': []}
 
-        log.info(f'LR - {self.optimizer.param_groups[0]["lr"]}')
+        self._log(f'LR - {self.optimizer.param_groups[0]["lr"]}')
         batch_iter = enumerate_with_estimate(
             self.train_dl,
             "E{} Training".format(epoch_ndx),
+            self.rank,
             start_ndx=self.train_dl.num_workers,
         )
 
@@ -426,7 +433,7 @@ class Runner:
         metrics_dict = {}
         metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
 
-        log.info(
+        self._log(
             ("E{} {:8} {loss/all:.4f} loss, "
              ).format(
                 epoch_ndx,
@@ -453,7 +460,7 @@ class Runner:
             metrics_dict['map/atypical'] = average_precisions['3'][0]
             metrics_dict['map/all'] = mean_ap
 
-            log.info(
+            self._log(
                 ("E{} {:8} {map/all:.4f} mAP@0.5, "
                  + "{map/negative:.4f} mAP/negative, "
                  + "{map/typical:.4f} mAP/typical "

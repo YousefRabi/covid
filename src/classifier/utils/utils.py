@@ -76,12 +76,13 @@ def fix_seed(seed):
 
 
 def enumerate_with_estimate(
-        iterable,
-        desc_str,
-        start_ndx=0,
-        print_ndx=4,
-        backoff=None,
-        iter_len=None,
+    iterable,
+    desc_str,
+    rank,
+    start_ndx=0,
+    print_ndx=4,
+    backoff=None,
+    iter_len=None,
 ):
     """
     In terms of behavior, `enumerate_with_estimate` is almost identical
@@ -151,10 +152,12 @@ def enumerate_with_estimate(
     while print_ndx < start_ndx * backoff:
         print_ndx *= backoff
 
-    log.warning("{} ----/{}, starting".format(
-        desc_str,
-        iter_len,
-    ))
+    if rank == 0:
+        log.warning("{} ----/{}, starting".format(
+            desc_str,
+            iter_len,
+        ))
+
     start_ts = time.time()
     for (current_ndx, item) in enumerate(iterable):
         yield (current_ndx, item)
@@ -167,21 +170,23 @@ def enumerate_with_estimate(
             done_dt = datetime.datetime.fromtimestamp(start_ts + duration_sec)
             done_td = datetime.timedelta(seconds=duration_sec)
 
-            log.info("{} {:-4}/{}, done at {}, {}".format(
-                desc_str,
-                current_ndx,
-                iter_len,
-                str(done_dt).rsplit('.', 1)[0],
-                str(done_td).rsplit('.', 1)[0],
-            ))
+            if rank == 0:
+                log.info("{} {:-4}/{}, done at {}, {}".format(
+                    desc_str,
+                    current_ndx,
+                    iter_len,
+                    str(done_dt).rsplit('.', 1)[0],
+                    str(done_td).rsplit('.', 1)[0],
+                ))
 
             print_ndx *= backoff
 
         if current_ndx + 1 == start_ndx:
             start_ts = time.time()
 
-    log.warning("{} ----/{}, done at {}".format(
-        desc_str,
-        iter_len,
-        str(datetime.datetime.now()).rsplit('.', 1)[0],
-    ))
+    if rank == 0:
+        log.warning("{} ----/{}, done at {}".format(
+            desc_str,
+            iter_len,
+            str(datetime.datetime.now()).rsplit('.', 1)[0],
+        ))
