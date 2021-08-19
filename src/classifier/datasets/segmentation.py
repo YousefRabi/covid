@@ -17,18 +17,14 @@ log = logging.getLogger(__name__)
 
 class StudySegmentationDataset(torch.utils.data.Dataset):
     def __init__(self,
-                 image_folder: str,
-                 opacity_mask_folder: str,
+                 config,
                  image_df: pd.DataFrame,
                  split: str,
                  transforms,
-                 image_resolution: int,
-                 external_data_folder: str = '',
-                 external_data_df: pd.DataFrame = False,
-                 overfit_single_batch: bool = False):
-        self.root = Path(image_folder)
-        self.mask_folder = Path(opacity_mask_folder)
-        self.image_resolution = image_resolution
+                 external_data_df: pd.DataFrame = False):
+        self.root = Path(config.data.data_dir)
+        self.mask_folder = Path(config.data.opacity_masks_dir)
+        self.image_resolution = config.data.image_resolution
         self.transforms = transforms
         self.image_df = image_df
 
@@ -39,8 +35,10 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
 
         self.image_paths = self.image_paths.tolist()
 
-        print('len(self.image_paths): ', len(self.image_paths))
+        if config.rank == 0:
+            log.info(f'len(self.image_paths): {len(self.image_paths)}')
 
+        external_data_folder = config.data.external_data_dir
         if external_data_folder and split == 'train':
             assert external_data_df is not False, 'You have to provide external df if specifying external_data_folder'
             external_image_fnames = external_data_df.fname.values
@@ -51,7 +49,8 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
             self.labels.extend(external_labels.tolist())
             self.study_ids.extend(external_study_ids.tolist())
 
-        print('len(self.image_paths): ', len(self.image_paths))
+        if config.rank == 0:
+            log.info(f'len(self.image_paths): {len(self.image_paths)}')
 
         self.log_study_ids = []
 
@@ -65,7 +64,7 @@ class StudySegmentationDataset(torch.utils.data.Dataset):
 
         self.log_image_ids = self.image_df.loc[self.image_df.study_id.isin(self.log_study_ids), 'image_id'].values
 
-        if overfit_single_batch:
+        if config.train.overfit_single_batch:
             self.image_names = [image_id + '.jpg' for image_id in self.log_image_ids]
             self.mask_names = [image_id + '.png' for image_id in self.log_image_ids]
             self.labels = self.image_df.loc[self.image_df.image_id.isin(self.log_image_ids), 'label'].values

@@ -27,15 +27,11 @@ def get_segmentation_dataset(config, split, transforms, folds_df):
     else:
         external_data_df = False
 
-    dataset = StudySegmentationDataset(config.data.data_dir,
-                                       config.data.opacity_masks_dir,
+    dataset = StudySegmentationDataset(config,
                                        folds_df,
                                        split,
                                        transforms,
-                                       config.data.image_resolution,
-                                       config.data.external_data_dir,
-                                       external_data_df,
-                                       config.train.overfit_single_batch)
+                                       external_data_df)
 
     return dataset
 
