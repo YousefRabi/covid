@@ -4,12 +4,10 @@ from easydict import EasyDict
 from collections import defaultdict
 
 import numpy as np
+import math
 
-import skimage.io
 import cv2
 from sklearn.metrics import confusion_matrix
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 import torch
 from torch.cuda.amp import autocast
@@ -21,7 +19,7 @@ from map_boxes import mean_average_precision_for_boxes
 from classifier.models import get_model
 from classifier.optimizers import get_optimizer
 from classifier.datasets import get_dataloader
-from classifier.transforms import get_transforms, get_first_place_melanoma_transforms, Mixup
+from classifier.transforms import get_transforms, Mixup
 from classifier.losses import LossBuilder
 from classifier.schedulers import SchedulerBuilder
 from classifier.utils.utils import (fix_seed, enumerate_with_estimate,
@@ -62,8 +60,8 @@ class Runner:
 
         self.device = torch.device('cuda')
 
-        self.ddp = len(os.environ['CUDA_VISIBLE_DEVICES']) > 1
-        if self.ddp:
+        self.is_distributed = config.world_size > 1
+        if self.is_distributed:
             assert self.rank is not None, 'rank is None when DDP is True'
             self.device = self.rank
         else:
@@ -111,7 +109,7 @@ class Runner:
         model = get_model(self.config)
         self._log("Using CUDA; current_device: {}.".format(torch.cuda.current_device()))
         model = model.to(self.device)
-        if self.ddp:
+        if self.is_distributed:
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
             model = DDP(model, device_ids=[self.device])
 
@@ -173,6 +171,9 @@ class Runner:
             self.optimizer.step()
 
         for epoch_ndx in range(1, self.config.train.num_epochs + 1):
+            if self.is_distributed:
+                self.train_dl.sampler.set_epoch(epoch_ndx)
+
             self._log("Epoch {} of {}, {}/{} batches of size {}".format(
                 epoch_ndx,
                 self.config.train.num_epochs,
@@ -194,7 +195,6 @@ class Runner:
                                               self.optimizer,
                                               self.scheduler,
                                               score,
-                                              self.config.multi_gpu,
                                               self.config.work_dir / 'checkpoints' / 'best_model.pth')
                     self.best_score = score
 
@@ -202,7 +202,6 @@ class Runner:
                                   self.optimizer,
                                   self.scheduler,
                                   score,
-                                  self.config.multi_gpu,
                                   self.config.work_dir / 'checkpoints' / 'latest_model.pth')
 
         self._log(f'Best mAP: {self.best_score}')
@@ -222,9 +221,10 @@ class Runner:
             self.scheduler.step(epoch_ndx)
 
         self.model.train()
+        dataset_length = math.ceil(len(self.train_dl.dataset) / self.config.world_size)
         trn_metrics_t = torch.zeros(
             METRICS_SIZE,
-            len(self.train_dl.dataset),
+            dataset_length,
             device=torch.device('cpu'),
         )
 
@@ -269,9 +269,10 @@ class Runner:
     def do_validation(self, epoch_ndx):
         with torch.no_grad():
             self.model.eval()
+            dataset_length = math.ceil(len(self.val_dl.dataset) / self.config.world_size)
             val_metrics_t = torch.zeros(
                 METRICS_SIZE,
-                len(self.val_dl.dataset),
+                dataset_length,
                 device=torch.device('cpu'),
             )
 

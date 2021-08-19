@@ -53,9 +53,9 @@ def img2tensor(image: np.ndarray, dtype: np.dtype = np.float32):
 
 
 def save_model_with_optimizer(model, optimizer, scheduler,
-                              best_score, multi_gpu, path):
+                              best_score, path):
     path.parent.mkdir(parents=True, exist_ok=True)
-    state_dict = model.module.state_dict() if multi_gpu else model.state_dict()
+    state_dict = model.state_dict()
     torch.save({
         'model_state_dict': state_dict,
         'optimizer_state_dict': optimizer.state_dict(),

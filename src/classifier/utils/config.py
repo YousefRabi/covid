@@ -209,7 +209,7 @@ def _get_default_config():
     c.scheduler.warmup.epochs = 1
 
     c.device = 'cuda:0'
-    c.multi_gpus = False
+    c.world_size = 1
     c.num_workers = 2
     c.work_dir = './work_dir'
     c.experiment_version = 0

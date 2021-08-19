@@ -1,6 +1,6 @@
 import pandas as pd
 
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, DistributedSampler
 
 from .classification import StudyClassificationDataset
 from .segmentation import StudySegmentationDataset
@@ -57,10 +57,16 @@ def get_dataloader(config, transforms, split):
                                                           folds_df)
 
     if split == 'train':
-        sampler = RandomSampler(dataset)
+        if config.world_size > 1:
+            sampler = DistributedSampler(dataset, seed=config.seed)
+        else:
+            sampler = RandomSampler(dataset)
         batch_size = config.train.batch_size
     else:
-        sampler = SequentialSampler(dataset)
+        if config.world_size > 1:
+            sampler = DistributedSampler(dataset, shuffle=False, seed=config.seed)
+        else:
+            sampler = SequentialSampler(dataset)
         batch_size = config.test.batch_size
 
     if config.rank == 0:

@@ -28,20 +28,22 @@ def init_process(rank, world_size, config_path, main_fn, backend='nccl'):
 
     torch.distributed.init_process_group('nccl', rank=rank, world_size=world_size)
 
-    main_fn(config_path, rank)
+    main_fn(config_path, rank, world_size)
 
 
 def cleanup_ddp():
     torch.distributed.destroy_process_group()
 
 
-def main(config_path, rank=None):
+def main(config_path, rank=None, world_size=1):
     time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
 
     config_path = Path(config_path)
 
     config = load_config(config_path)
     config.rank = rank
+    config.world_size = world_size
+
     config_work_dir = Path('trained-models') / config_path.parent.stem / time_str / f'fold-{config.data.idx_fold}'
 
     fix_seed(config.seed)
