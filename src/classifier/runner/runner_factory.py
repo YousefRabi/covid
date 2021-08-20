@@ -264,8 +264,6 @@ class Runner:
             if self.config.scheduler.name in ['onecycle', 'cosine']:
                 self.scheduler.step()
 
-            break
-
         self.total_training_samples_count += len(self.train_dl.dataset)
 
         return trn_metrics_t.to('cpu'), labels_dict, preds_dict, confusion_matrix_dict
