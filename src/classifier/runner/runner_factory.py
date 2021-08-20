@@ -189,20 +189,22 @@ class Runner:
                 val_metrics_t, labels_arr, preds_arr, confusion_matrix_dict = self.do_validation(epoch_ndx)
                 score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr, confusion_matrix_dict)
 
-                if score > self.best_score:
-                    self._log(f'mAP improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
-                    save_model_with_optimizer(self.model,
-                                              self.optimizer,
-                                              self.scheduler,
-                                              score,
-                                              self.config.work_dir / 'checkpoints' / 'best_model.pth')
-                    self.best_score = score
+                if self.rank == 0:
+                    if score > self.best_score:
+                        self._log(f'mAP improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
+                        save_model_with_optimizer(self.model,
+                                                  self.optimizer,
+                                                  self.scheduler,
+                                                  score,
+                                                  self.config.work_dir / 'checkpoints' / 'best_model.pth')
+                        self.best_score = score
 
-        save_model_with_optimizer(self.model,
-                                  self.optimizer,
-                                  self.scheduler,
-                                  score,
-                                  self.config.work_dir / 'checkpoints' / 'latest_model.pth')
+        if self.rank == 0:
+            save_model_with_optimizer(self.model,
+                                      self.optimizer,
+                                      self.scheduler,
+                                      score,
+                                      self.config.work_dir / 'checkpoints' / 'latest_model.pth')
 
         self._log(f'Best mAP: {self.best_score}')
         self.trn_writer.close()
@@ -261,6 +263,8 @@ class Runner:
 
             if self.config.scheduler.name in ['onecycle', 'cosine']:
                 self.scheduler.step()
+
+            break
 
         self.total_training_samples_count += len(self.train_dl.dataset)
 
@@ -433,60 +437,77 @@ class Runner:
 
         metrics_dict = {}
         if self.is_distributed:
-            print('metrics_t shape: ', metrics_t.shape)
             gathered_tensor = [torch.zeros_like(metrics_t) for _ in range(torch.distributed.get_world_size())]
 
             torch.distributed.all_gather(gathered_tensor, metrics_t)
             gathered_tensor = torch.cat(gathered_tensor, dim=1)
             metrics_t = gathered_tensor
-            print('metrics_t shape: ', metrics_t.shape)
 
-        metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
+            gathered_preds_list = [defaultdict(list) for _ in range(torch.distributed.get_world_size())]
 
-        self._log(
-            ("E{} {:8} {loss/all:.4f} loss, "
-             ).format(
-                epoch_ndx,
-                mode_str,
-                **metrics_dict,
-            )
-        )
+            gathered_preds_list = gathered_preds_list if self.rank == 0 else None
+            torch.distributed.gather_object(preds_dict, gathered_preds_list)
 
-        labels_arr = np.array([[key, value, 0, 1, 0, 1] for key, value in labels_dict.items()])
+            gathered_labels_list = [dict() for _ in range(torch.distributed.get_world_size())]
 
-        preds_arr = []
-        for key, value in preds_dict.items():
-            mean_preds = np.mean(value, axis=0)
-            for i, cls_pred in enumerate(mean_preds):
-                preds_arr.append([key, i, cls_pred, 0, 1, 0, 1])
-        preds_arr = np.array(preds_arr)
-
-        mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
-        # Multiply by 2 /3 because LB metric is mAP and study ids have 4 labels and image ids have 2 labels
-        metrics_dict['map/negative'] = average_precisions['0'][0]
-        metrics_dict['map/typical'] = average_precisions['1'][0]
-        metrics_dict['map/indeterminate'] = average_precisions['2'][0]
-        metrics_dict['map/atypical'] = average_precisions['3'][0]
-        metrics_dict['map/all'] = mean_ap
-
-        self._log(
-            ("E{} {:8} {map/all:.4f} mAP@0.5, "
-             + "{map/negative:.4f} mAP/negative, "
-             + "{map/typical:.4f} mAP/typical "
-             + "{map/indeterminate:.4f} mAP/indeterminate "
-             + "{map/atypical:.4f} mAP/atypical "
-             ).format(
-                epoch_ndx,
-                mode_str,
-                **metrics_dict,
-            )
-        )
-
-        writer = getattr(self, mode_str + '_writer')
-
-        prefix_str = 'cls_'
+            gathered_labels_list = gathered_labels_list if self.rank == 0 else None
+            torch.distributed.gather_object(labels_dict, gathered_labels_list)
 
         if self.rank == 0:
+            if self.is_distributed:
+                gathered_preds_dict = {
+                    key: value for dictionary in gathered_preds_list for key, value in dictionary.items()}
+                preds_dict = gathered_preds_dict
+
+                gathered_labels_dict = {
+                    key: value for dictionary in gathered_labels_list for key, value in dictionary.items()}
+                labels_dict = gathered_labels_dict
+
+            metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
+
+            self._log(
+                ("E{} {:8} {loss/all:.4f} loss, "
+                 ).format(
+                    epoch_ndx,
+                    mode_str,
+                    **metrics_dict,
+                )
+            )
+
+            labels_arr = np.array([[key, value, 0, 1, 0, 1] for key, value in labels_dict.items()])
+
+            preds_arr = []
+            for key, value in preds_dict.items():
+                mean_preds = np.mean(value, axis=0)
+                for i, cls_pred in enumerate(mean_preds):
+                    preds_arr.append([key, i, cls_pred, 0, 1, 0, 1])
+            preds_arr = np.array(preds_arr)
+
+            mean_ap, average_precisions = mean_average_precision_for_boxes(labels_arr, preds_arr, verbose=False)
+            # Multiply by 2 /3 because LB metric is mAP and study ids have 4 labels and image ids have 2 labels
+            metrics_dict['map/negative'] = average_precisions['0'][0]
+            metrics_dict['map/typical'] = average_precisions['1'][0]
+            metrics_dict['map/indeterminate'] = average_precisions['2'][0]
+            metrics_dict['map/atypical'] = average_precisions['3'][0]
+            metrics_dict['map/all'] = mean_ap
+
+            self._log(
+                ("E{} {:8} {map/all:.4f} mAP@0.5, "
+                 + "{map/negative:.4f} mAP/negative, "
+                 + "{map/typical:.4f} mAP/typical "
+                 + "{map/indeterminate:.4f} mAP/indeterminate "
+                 + "{map/atypical:.4f} mAP/atypical "
+                 ).format(
+                    epoch_ndx,
+                    mode_str,
+                    **metrics_dict,
+                )
+            )
+
+            writer = getattr(self, mode_str + '_writer')
+
+            prefix_str = 'cls_'
+
             for key, value in metrics_dict.items():
                 writer.add_scalar(prefix_str + key, value, self.total_training_samples_count)
 
@@ -504,4 +525,4 @@ class Runner:
 
             writer.flush()
 
-        return metrics_dict['map/all']
+            return metrics_dict['map/all']

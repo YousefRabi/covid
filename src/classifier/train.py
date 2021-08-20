@@ -35,7 +35,7 @@ def cleanup_ddp():
     torch.distributed.destroy_process_group()
 
 
-def main(config_path, rank=None, world_size=1):
+def main(config_path, rank=0, world_size=1):
     time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
 
     config_path = Path(config_path)

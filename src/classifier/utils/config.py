@@ -210,6 +210,7 @@ def _get_default_config():
 
     c.device = 'cuda:0'
     c.world_size = 1
+    c.rank = 0
     c.num_workers = 2
     c.work_dir = './work_dir'
     c.experiment_version = 0
