@@ -432,6 +432,15 @@ class Runner:
         # assert torch.isfinite(metrics_t).all()
 
         metrics_dict = {}
+        if self.is_distributed:
+            print('metrics_t shape: ', metrics_t.shape)
+            gathered_tensor = [torch.zeros_like(metrics_t) for _ in range(torch.distributed.get_world_size())]
+
+            torch.distributed.all_gather(gathered_tensor, metrics_t)
+            gathered_tensor = torch.cat(gathered_tensor, dim=1)
+            metrics_t = gathered_tensor
+            print('metrics_t shape: ', metrics_t.shape)
+
         metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
 
         self._log(

@@ -22,11 +22,11 @@ def parse_args():
     return args
 
 
-def init_process(rank, world_size, config_path, main_fn, backend='nccl'):
+def init_process(rank, world_size, config_path, main_fn, backend='gloo'):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
 
-    torch.distributed.init_process_group('nccl', rank=rank, world_size=world_size)
+    torch.distributed.init_process_group(backend, rank=rank, world_size=world_size)
 
     main_fn(config_path, rank, world_size)
 
