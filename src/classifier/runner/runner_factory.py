@@ -206,9 +206,9 @@ class Runner:
                                       score,
                                       self.config.work_dir / 'checkpoints' / 'latest_model.pth')
 
-        self._log(f'Best mAP: {self.best_score}')
-        self.trn_writer.close()
-        self.val_writer.close()
+            self._log(f'Best mAP: {self.best_score}')
+            self.trn_writer.close()
+            self.val_writer.close()
 
         trn_loss = trn_metrics_t[METRICS_LOSS_NDX].mean()
 
