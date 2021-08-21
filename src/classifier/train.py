@@ -31,11 +31,7 @@ def init_process(rank, world_size, config_path, main_fn, backend='gloo'):
     main_fn(config_path, rank, world_size)
 
 
-def cleanup_ddp():
-    torch.distributed.destroy_process_group()
-
-
-def main(config_path, rank=0, world_size=1):
+def main(config_path, rank, world_size=1):
     time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
 
     config_path = Path(config_path)
@@ -74,4 +70,4 @@ if __name__ == '__main__':
                                     join=True)
 
     else:
-        main(args.config)
+        main(args.config, args.local_rank)

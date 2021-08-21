@@ -18,7 +18,7 @@ model:
 train:
   batch_size: 16 
   overfit_single_batch: False
-  num_epochs: 10
+  num_epochs: 20
   snapshots: 1
 
 test:
@@ -61,7 +61,7 @@ loss:
 optimizer:
   name: 'SGD'
   params:
-    lr: 1.0e-2
+    lr: 3.0e-3
     momentum: 0.9
     weight_decay: 1.0e-5
 
