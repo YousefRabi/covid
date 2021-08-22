@@ -4,15 +4,14 @@ from easydict import EasyDict
 from collections import defaultdict
 
 import numpy as np
+import math
 
-import skimage.io
 import cv2
 from sklearn.metrics import confusion_matrix
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 import torch
 from torch.cuda.amp import autocast
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
 from map_boxes import mean_average_precision_for_boxes
@@ -20,7 +19,7 @@ from map_boxes import mean_average_precision_for_boxes
 from classifier.models import get_model
 from classifier.optimizers import get_optimizer
 from classifier.datasets import get_dataloader
-from classifier.transforms import get_transforms, get_first_place_melanoma_transforms, Mixup
+from classifier.transforms import get_transforms, Mixup
 from classifier.losses import LossBuilder
 from classifier.schedulers import SchedulerBuilder
 from classifier.utils.utils import (fix_seed, enumerate_with_estimate,
@@ -45,6 +44,7 @@ id2label = {0: 'negative', 1: 'typical', 2: 'indeterminate', 3: 'atypical'}
 class Runner:
 
     def __init__(self, config: EasyDict):
+        self.rank = config.rank
         self.config = config
 
         self.log_to_experiment_folder()
@@ -60,8 +60,15 @@ class Runner:
 
         self.device = torch.device('cuda')
 
+        self.is_distributed = config.world_size > 1
+        if self.is_distributed:
+            assert self.rank is not None, 'rank is None when DDP is True'
+            self.device = self.rank
+        else:
+            self.rank = 0
+
         self.trn_transforms = get_transforms(config.transforms.train)
-        log.info(f'train transforms: {self.trn_transforms}')
+        self._log(f'train transforms: {self.trn_transforms}')
         self.val_transforms = get_transforms(config.transforms.test)
         self.mixup_fn = Mixup(**config.mixup) if config.mixup.prob > 0 else None
 
@@ -94,12 +101,17 @@ class Runner:
         file_handler.setLevel(logging.INFO)
         log.addHandler(file_handler)
 
+    def _log(self, message):
+        if self.rank == 0:
+            log.info(message)
+
     def init_model(self):
         model = get_model(self.config)
-        log.info("Using CUDA; current_device: {}.".format(torch.cuda.current_device()))
-        if self.config.multi_gpu:
-            model = torch.nn.DataParallel(model)
+        self._log("Using CUDA; current_device: {}.".format(torch.cuda.current_device()))
         model = model.to(self.device)
+        if self.is_distributed:
+            model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            model = DDP(model, device_ids=[self.device])
 
         return model
 
@@ -136,7 +148,7 @@ class Runner:
         return get_dataloader(self.config, self.val_transforms, 'valid')
 
     def init_tensorboard_writers(self):
-        if self.trn_writer is None:
+        if self.trn_writer is None and self.rank == 0:
             log_dir = os.path.join(
                 'runs',
                 self.config.experiment_version,
@@ -150,7 +162,7 @@ class Runner:
                 log_dir=log_dir + '-val')
 
     def run(self):
-        log.info("Starting {}, {}".format(type(self).__name__, self.config))
+        self._log("Starting {}, {}".format(type(self).__name__, self.config))
 
         score = 0.0
 
@@ -159,7 +171,10 @@ class Runner:
             self.optimizer.step()
 
         for epoch_ndx in range(1, self.config.train.num_epochs + 1):
-            log.info("Epoch {} of {}, {}/{} batches of size {}".format(
+            if self.is_distributed:
+                self.train_dl.sampler.set_epoch(epoch_ndx)
+
+            self._log("Epoch {} of {}, {}/{} batches of size {}".format(
                 epoch_ndx,
                 self.config.train.num_epochs,
                 len(self.train_dl),
@@ -174,26 +189,28 @@ class Runner:
                 val_metrics_t, labels_arr, preds_arr, confusion_matrix_dict = self.do_validation(epoch_ndx)
                 score = self.log_metrics(epoch_ndx, 'val', val_metrics_t, labels_arr, preds_arr, confusion_matrix_dict)
 
-                if score > self.best_score:
-                    log.info(f'mAP improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
-                    save_model_with_optimizer(self.model,
-                                              self.optimizer,
-                                              self.scheduler,
-                                              score,
-                                              self.config.multi_gpu,
-                                              self.config.work_dir / 'checkpoints' / 'best_model.pth')
-                    self.best_score = score
+                if self.rank == 0:
+                    if score > self.best_score:
+                        self._log(f'mAP improved from {self.best_score:.6f} -> {score:.6f}. Saving model.')
+                        save_model_with_optimizer(self.model,
+                                                  self.optimizer,
+                                                  self.scheduler,
+                                                  score,
+                                                  self.config.work_dir / 'checkpoints' / 'best_model.pth',
+                                                  multi_gpu=self.config.world_size > 1)
+                        self.best_score = score
 
-        save_model_with_optimizer(self.model,
-                                  self.optimizer,
-                                  self.scheduler,
-                                  score,
-                                  self.config.multi_gpu,
-                                  self.config.work_dir / 'checkpoints' / 'latest_model.pth')
+        if self.rank == 0:
+            save_model_with_optimizer(self.model,
+                                      self.optimizer,
+                                      self.scheduler,
+                                      score,
+                                      self.config.work_dir / 'checkpoints' / 'latest_model.pth',
+                                      multi_gpu=self.config.world_size > 1)
 
-        log.info(f'Best mAP: {self.best_score}')
-        self.trn_writer.close()
-        self.val_writer.close()
+            self._log(f'Best mAP: {self.best_score}')
+            self.trn_writer.close()
+            self.val_writer.close()
 
         trn_loss = trn_metrics_t[METRICS_LOSS_NDX].mean()
 
@@ -208,9 +225,10 @@ class Runner:
             self.scheduler.step(epoch_ndx)
 
         self.model.train()
+        dataset_length = math.ceil(len(self.train_dl.dataset) / self.config.world_size)
         trn_metrics_t = torch.zeros(
             METRICS_SIZE,
-            len(self.train_dl.dataset),
+            dataset_length,
             device=torch.device('cpu'),
         )
 
@@ -218,10 +236,11 @@ class Runner:
         preds_dict = defaultdict(list)
         confusion_matrix_dict = {'labels': [], 'preds': []}
 
-        log.info(f'LR - {self.optimizer.param_groups[0]["lr"]}')
+        self._log(f'LR - {self.optimizer.param_groups[0]["lr"]}')
         batch_iter = enumerate_with_estimate(
             self.train_dl,
             "E{} Training".format(epoch_ndx),
+            self.rank,
             start_ndx=self.train_dl.num_workers,
         )
 
@@ -254,9 +273,10 @@ class Runner:
     def do_validation(self, epoch_ndx):
         with torch.no_grad():
             self.model.eval()
+            dataset_length = math.ceil(len(self.val_dl.dataset) / self.config.world_size)
             val_metrics_t = torch.zeros(
                 METRICS_SIZE,
-                len(self.val_dl.dataset),
+                dataset_length,
                 device=torch.device('cpu'),
             )
 
@@ -267,6 +287,7 @@ class Runner:
             batch_iter = enumerate_with_estimate(
                 self.val_dl,
                 "E{} Validation ".format(epoch_ndx),
+                self.rank,
                 start_ndx=self.val_dl.num_workers,
             )
 
@@ -321,13 +342,12 @@ class Runner:
         for i, study_id in enumerate(study_id_arr):
             preds_dict[study_id].append(probability_arr[i])
             labels_dict[study_id] = label_g.cpu().detach().numpy()[i]
-            if study_id in self.train_dl.dataset.log_study_ids:
+            if study_id in self.train_dl.dataset.log_study_ids and self.rank == 0:
                 self.log_image(epoch_ndx, input_g[i], mask_g[i], label_g[i], study_id,
                                mask_pred_g[i], logits_g[i], mode_str)
 
-        metrics_t[METRICS_LOSS_NDX, start_ndx:end_ndx] = cls_loss_g
-
         mean_loss = cls_loss_g.mean() + self.config.loss.params.seg_multiplier * seg_loss_g.mean()
+        metrics_t[METRICS_LOSS_NDX, start_ndx:end_ndx] = mean_loss
 
         return mean_loss
 
@@ -416,18 +436,44 @@ class Runner:
         # assert torch.isfinite(metrics_t).all()
 
         metrics_dict = {}
-        metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
+        if self.is_distributed:
+            gathered_tensor = [torch.zeros_like(metrics_t) for _ in range(torch.distributed.get_world_size())]
 
-        log.info(
-            ("E{} {:8} {loss/all:.4f} loss, "
-             ).format(
-                epoch_ndx,
-                mode_str,
-                **metrics_dict,
+            torch.distributed.all_gather(gathered_tensor, metrics_t)
+            gathered_tensor = torch.cat(gathered_tensor, dim=1)
+            metrics_t = gathered_tensor
+
+            gathered_preds_list = [defaultdict(list) for _ in range(torch.distributed.get_world_size())]
+
+            gathered_preds_list = gathered_preds_list if self.rank == 0 else None
+            torch.distributed.gather_object(preds_dict, gathered_preds_list)
+
+            gathered_labels_list = [dict() for _ in range(torch.distributed.get_world_size())]
+
+            gathered_labels_list = gathered_labels_list if self.rank == 0 else None
+            torch.distributed.gather_object(labels_dict, gathered_labels_list)
+
+        if self.rank == 0:
+            if self.is_distributed:
+                gathered_preds_dict = {
+                    key: value for dictionary in gathered_preds_list for key, value in dictionary.items()}
+                preds_dict = gathered_preds_dict
+
+                gathered_labels_dict = {
+                    key: value for dictionary in gathered_labels_list for key, value in dictionary.items()}
+                labels_dict = gathered_labels_dict
+
+            metrics_dict['loss/all'] = metrics_t[METRICS_LOSS_NDX].mean()
+
+            self._log(
+                ("E{} {:8} {loss/all:.4f} loss, "
+                 ).format(
+                    epoch_ndx,
+                    mode_str,
+                    **metrics_dict,
+                )
             )
-        )
 
-        if mode_str == 'val':
             labels_arr = np.array([[key, value, 0, 1, 0, 1] for key, value in labels_dict.items()])
 
             preds_arr = []
@@ -445,7 +491,7 @@ class Runner:
             metrics_dict['map/atypical'] = average_precisions['3'][0]
             metrics_dict['map/all'] = mean_ap
 
-            log.info(
+            self._log(
                 ("E{} {:8} {map/all:.4f} mAP@0.5, "
                  + "{map/negative:.4f} mAP/negative, "
                  + "{map/typical:.4f} mAP/typical "
@@ -458,28 +504,25 @@ class Runner:
                 )
             )
 
-        writer = getattr(self, mode_str + '_writer')
+            writer = getattr(self, mode_str + '_writer')
 
-        prefix_str = 'cls_'
+            prefix_str = 'cls_'
 
-        for key, value in metrics_dict.items():
-            writer.add_scalar(prefix_str + key, value, self.total_training_samples_count)
+            for key, value in metrics_dict.items():
+                writer.add_scalar(prefix_str + key, value, self.total_training_samples_count)
 
-        if mode_str == 'val':
+            if mode_str == 'val':
 
-            cm = confusion_matrix(confusion_matrix_dict['labels'], confusion_matrix_dict['preds'])
-            confusion_matrix_image = confusion_matrix_to_image(cm)
+                cm = confusion_matrix(confusion_matrix_dict['labels'], confusion_matrix_dict['preds'])
+                confusion_matrix_image = confusion_matrix_to_image(cm)
 
-            writer.add_image(
-                f'{mode_str}-confusion-matrix',
-                confusion_matrix_image,
-                self.total_training_samples_count,
-                dataformats='HWC',
-            )
+                writer.add_image(
+                    f'{mode_str}-confusion-matrix',
+                    confusion_matrix_image,
+                    self.total_training_samples_count,
+                    dataformats='HWC',
+                )
 
-        writer.flush()
+            writer.flush()
 
-        if mode_str == 'trn':
-            return metrics_dict['loss/all']
-
-        return metrics_dict['map/all']
+            return metrics_dict['map/all']
