@@ -196,7 +196,8 @@ class Runner:
                                                   self.optimizer,
                                                   self.scheduler,
                                                   score,
-                                                  self.config.work_dir / 'checkpoints' / 'best_model.pth')
+                                                  self.config.work_dir / 'checkpoints' / 'best_model.pth',
+                                                  multi_gpu=self.config.world_size > 1)
                         self.best_score = score
 
         if self.rank == 0:
@@ -204,7 +205,8 @@ class Runner:
                                       self.optimizer,
                                       self.scheduler,
                                       score,
-                                      self.config.work_dir / 'checkpoints' / 'latest_model.pth')
+                                      self.config.work_dir / 'checkpoints' / 'latest_model.pth',
+                                      multi_gpu=self.config.world_size > 1)
 
             self._log(f'Best mAP: {self.best_score}')
             self.trn_writer.close()

@@ -53,9 +53,9 @@ def img2tensor(image: np.ndarray, dtype: np.dtype = np.float32):
 
 
 def save_model_with_optimizer(model, optimizer, scheduler,
-                              best_score, path):
+                              best_score, path, multi_gpu=False):
     path.parent.mkdir(parents=True, exist_ok=True)
-    state_dict = model.state_dict()
+    state_dict = model.module.state_dict() if multi_gpu else model.state_dict()
     torch.save({
         'model_state_dict': state_dict,
         'optimizer_state_dict': optimizer.state_dict(),
@@ -77,7 +77,7 @@ def fix_seed(seed):
 def enumerate_with_estimate(
     iterable,
     desc_str,
-    rank,
+    rank=0,
     start_ndx=0,
     print_ndx=4,
     backoff=None,
