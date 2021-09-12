@@ -2,7 +2,6 @@ pretrainedmodels
 pycocotools
 imgaug
 easydict
-torchvision
 scikit_image
 thop
 numpy
@@ -11,14 +10,11 @@ pytest
 matplotlib
 opencv_python_headless
 tqdm
-efficientnet_pytorch
 seaborn
 requests
-torch
 pandas
 pydicom
 scipy
-adabelief_pytorch
 coremltools
 Flask
 onnx
@@ -28,4 +24,3 @@ protobuf
 PyYAML
 scikit-learn
 scikit-image
-warmup_scheduler
