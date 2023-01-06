@@ -2,7 +2,7 @@
 
 This repository contains the code for the classifier part of the solution.
 
-It's in src/classifier.
+It's in <code>src/classifier</code>.
 
 The configs for the experiment are in src/config.
 
